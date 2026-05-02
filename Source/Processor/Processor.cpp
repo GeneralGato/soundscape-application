@@ -30,7 +30,7 @@ void Processor::audioDeviceIOCallbackWithContext(const float* const* inputChanne
     auto* outL = (numOutputChannels > 0 && outputChannelData != nullptr) ? outputChannelData[0] : nullptr;
     auto* outR = (numOutputChannels > 1 && outputChannelData != nullptr) ? outputChannelData[1] : nullptr;
 
-    for (int channel = 2; channel < numOutputChannels; ++channel)
+    for (int channel = 0; channel < numOutputChannels; ++channel)
     {
         if (auto* output = outputChannelData[channel])
         {
@@ -38,27 +38,13 @@ void Processor::audioDeviceIOCallbackWithContext(const float* const* inputChanne
         }
     }
 
-    while (numSamples--)
-    {
-        const auto frame = player.renderNextFrame();
-
-        if (outL != nullptr)
-        {
-            *outL = frame.left;
-            ++outL;
-        }
-
-        if (outR != nullptr)
-        {
-            *outR = frame.right;
-            ++outR;
-        }
-    }
+    player.renderNextBlock(outL, outR, totalSamples);
 }
 
 void Processor::audioDeviceAboutToStart(juce::AudioIODevice* device)
 {
-    juce::ignoreUnused(device);
+    player.prepareToPlay(device != nullptr ? device->getCurrentSampleRate() : 44100.0,
+                         device != nullptr ? device->getCurrentBufferSizeSamples() : 0);
 }
 
 void Processor::audioDeviceStopped()

@@ -2,6 +2,7 @@
 
 #include <JuceHeader.h>
 #include <array>
+#include <atomic>
 #include <thread>
 
 class Player
@@ -44,8 +45,11 @@ public:
 	/** Returns the playback state for a foreground sound */
 	bool isForegroundSoundPlaying(int soundIndex) const;
 
-	/** Renders one stereo output frame */
-	StereoFrame renderNextFrame();
+	/** Prepares the playback engine for the active output device */
+	void prepareToPlay(double sampleRate, int samplesPerBlockExpected);
+
+	/** Renders a block of stereo output samples */
+	void renderNextBlock(float* leftChannel, float* rightChannel, int numSamples);
 
 	/** Method that stores file paths in strings */
 	void filePathStorage();
@@ -65,14 +69,23 @@ public:
 	/** Returns true when the audio library failed to load */
 	bool didLoadFail() const { return loadFailed.load(); }
 
-	/** Stores the global gain for background sounds */
-	float globalBackgroundSoundsGain = 1.0f;
+	/** Updates the global gain for background sounds */
+	void setGlobalBackgroundGain(float gain);
 
-	/** Stores the global gain for foreground sounds */
-	float globalForegroundSoundsGain = 1.0f;
+	/** Updates the global gain for foreground sounds */
+	void setGlobalForegroundGain(float gain);
 
-	/** Keeps tabs on the first background sounds volume */
-	BackgroundLayerGains individualBackgroundSoundsGain{};
+	/** Updates one layer gain inside a background bank */
+	void setBackgroundLayerGain(int bankIndex, int layerIndex, float gain);
+
+	/** Updates a background bank master gain */
+	void setBackgroundBankGain(int bankIndex, float gain);
+
+	/** Updates the gain for one foreground sound */
+	void setForegroundGain(int soundIndex, float gain);
+
+	/** Updates the stereo pan for one foreground sound */
+	void setForegroundPan(int soundIndex, float pan);
 
 	/** String storage of background sounds file paths */
 	BackgroundPathGrid backgroundFilePathStorage{};
@@ -80,16 +93,15 @@ public:
 	/** String storage of foreground sounds file paths */
 	std::array<std::string, numForegroundSounds> foregroundFilePathStorage{};
 
-	/** Stores the gain values of Background Sounds */
-	std::array<float, numBackgroundBanks> bankBackgroundSoundsGain{};
-	
-	/** Stores the gain values of Foreground Sounds */
-	std::array<float, numForegroundSounds> individualForegroundSoundsGain{};
-
-	/** Stores pan values for Foreground Sounds */
-	std::array<float, numForegroundSounds> foregroundSoundsPan{};
-
 private:
+	using SmoothedFloat = juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>;
+	using AtomicBackgroundLayerGains = std::array<std::array<std::atomic<float>, numBackgroundLayers>, numBackgroundBanks>;
+	using AtomicBackgroundBankGains = std::array<std::atomic<float>, numBackgroundBanks>;
+	using AtomicForegroundGains = std::array<std::atomic<float>, numForegroundSounds>;
+	using SmoothedBackgroundLayerGains = std::array<std::array<SmoothedFloat, numBackgroundLayers>, numBackgroundBanks>;
+	using SmoothedBackgroundBankGains = std::array<SmoothedFloat, numBackgroundBanks>;
+	using SmoothedForegroundGains = std::array<SmoothedFloat, numForegroundSounds>;
+	using SmoothedPanGains = std::array<SmoothedFloat, numForegroundSounds>;
 	using BackgroundEnableStates = std::array<std::atomic<bool>, numBackgroundBanks>;
 	using ForegroundEnableStates = std::array<std::atomic<bool>, numForegroundSounds>;
 	using BackgroundPositions = std::array<std::array<unsigned int, numBackgroundLayers>, numBackgroundBanks>;
@@ -99,7 +111,11 @@ private:
 
 	bool isIndexValid(int index, int upperBound) const;
 	void initialiseDefaults();
+	void initialiseSmoothing(double sampleRate);
+	void updateSmoothedTargets();
+	void snapInactiveParameters();
 	bool loadMonoFile(const juce::File& file, juce::AudioFormatManager& formatManager, juce::AudioBuffer<float>& destination);
+	void storeForegroundPanTargets(int soundIndex, float pan);
 
 	/** Indication of on/off states of background sounds */
 	BackgroundEnableStates backgroundBankEnabled{};
@@ -118,6 +134,22 @@ private:
 
 	/** Audio buffer for each foreground sound */
 	ForegroundBuffers foregroundBuffers{};
+
+	std::atomic<float> globalBackgroundGainTarget{ 1.0f };
+	std::atomic<float> globalForegroundGainTarget{ 1.0f };
+	AtomicBackgroundLayerGains backgroundLayerGainTargets{};
+	AtomicBackgroundBankGains backgroundBankGainTargets{};
+	AtomicForegroundGains foregroundGainTargets{};
+	AtomicForegroundGains foregroundLeftPanTargets{};
+	AtomicForegroundGains foregroundRightPanTargets{};
+	SmoothedFloat globalBackgroundGain{};
+	SmoothedFloat globalForegroundGain{};
+	SmoothedBackgroundLayerGains backgroundLayerGains{};
+	SmoothedBackgroundBankGains backgroundBankGains{};
+	SmoothedForegroundGains foregroundGains{};
+	SmoothedPanGains foregroundLeftPanGains{};
+	SmoothedPanGains foregroundRightPanGains{};
+	double currentSampleRate = 44100.0;
 
 	std::atomic<bool> loadCompleted{ false };
 	std::atomic<bool> loadInProgress{ false };

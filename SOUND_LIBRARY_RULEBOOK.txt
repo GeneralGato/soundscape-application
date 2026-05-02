@@ -1,0 +1,151 @@
+SOUNDSCAPE APPLICATION - SOUND LIBRARY RULEBOOK
+
+Purpose
+- These rules are meant to keep future sound assets easy to implement, efficient on phone hardware, and pleasant to listen to for long sessions.
+- They reflect the current app architecture: each bed can use 1 stereo stem for default playback and up to 6 separate layer files for custom blend mode.
+
+Current Runtime Assumptions
+- Sample rate for all delivery assets: 48000 Hz.
+- Default bed playback uses 1 stereo stem.
+- Custom bed playback uses up to 6 separate layer files.
+- Solo loops use 1 file each.
+- Current phone stream budget:
+  - 1 stem bed = 1 stream unit
+  - 1 custom-layer bed = 6 stream units
+  - 1 solo loop = 1 stream unit
+
+Core Technical Defaults
+- Archive masters:
+  - 48000 Hz
+  - 24-bit WAV minimum
+  - 32-bit float is fine inside the DAW while editing
+- Current app delivery assets:
+  - 48000 Hz
+  - MP3 is acceptable for now because it matches the current runtime and packaging flow
+- Keep one untouched master export for every final delivery file.
+- Never make final app assets by repeatedly re-encoding older MP3 exports.
+
+Bank Design Rules
+- Every soundscape bed should ideally ship with:
+  - 1 stereo stem for default playback
+  - up to 6 layer files for custom blend mode
+- Within one bed, all layer files and the corresponding stem should have exactly the same duration in samples.
+- Across different beds, durations may differ.
+- Preferred loop lengths are round and practical values such as 60 s, 90 s, 120 s, or 180 s.
+- The stem should be rendered from the same exact timeline as the 6 layer files whenever possible.
+- If a bed does not truly need 6 useful layers, fewer strong layers are better than filler.
+
+Solo Loop Design Rules
+- Solo loops should loop cleanly on their own.
+- Use mono when the sound is meant to be panned in the app and does not need a fixed stereo image.
+- Use stereo only when width or spatial identity is essential to the sound.
+- Keep solo loops relatively stable and uncluttered; they should sit on top of beds without masking them too aggressively.
+
+Loop Editing Rules
+- Build loops from longer source recordings whenever possible.
+- Avoid cutting directly on obvious transient events.
+- Keep important thunder cracks, owl calls, or other distinctive events away from the loop boundary when possible.
+- Edit at zero crossings when practical.
+- Create an equal-power crossfade between the end and beginning if the source does not already loop naturally.
+- Typical ambience crossfade length: 0.5 s to 5 s.
+- Longer tonal or evolving material may need longer crossfades.
+- Remove unintended leading or trailing silence unless every asset in that bed intentionally shares the same silence offset.
+- After editing, audition at least 10 repeated loop passes on headphones before considering a loop finished.
+
+Mix and Loudness Rules
+- Do not master these assets hot.
+- Headroom is more important than loudness.
+- Individual bed layers and solo loops:
+  - sample peak no higher than about -6 dBFS
+- Stems:
+  - true peak no higher than about -3 dBTP
+  - preferably closer to -6 dBFS sample peak if the stem is dense
+- Do not force all layers to the same LUFS.
+- Use LUFS only as a rough consistency check, not as a strict target.
+- Dense stems will often land somewhere around -24 to -18 LUFS integrated.
+- Sparse natural layers may read much lower; that is acceptable if the subjective balance is right.
+- Match layers within a bed primarily by ear.
+- Preserve natural relative balance instead of flattening every layer to identical loudness.
+
+Dynamics and Processing Rules
+- Use minimal compression.
+- Avoid aggressive limiting.
+- Avoid heavy stereo enhancement on assets that may later be layered.
+- Avoid harsh denoising that causes watery artifacts.
+- Remove obvious clicks, pops, clipping, handling noise, and low-frequency bumps.
+- If there is constant machine noise, reduce it gently rather than over-processing the file.
+
+Spatial Audio Rules
+- M/S recording is feasible and recommended for future ambience work.
+- For M/S captures:
+  - keep raw Mid and Side masters archived
+  - export a decoded stereo stem for the current app
+  - optionally keep alternate width renders later if the app gets a width control
+- Binaural recording is also feasible, but use it selectively.
+- Treat binaural assets as self-contained stereo scenes, not as ordinary mono loops that will be panned later.
+- Use binaural mainly for hero scenes or headphone-first ambience, not as the default format for every layer.
+- If a sound is meant to be panned interactively in the app, mono is usually the better source format.
+
+Performance-Oriented Asset Choices
+- The cheapest default playback path is a stereo stem.
+- The expensive path is custom layer playback.
+- If phone performance matters more than editability for a specific bed, bias the design toward a strong stem and fewer active layer variants.
+- Prefer fewer, more distinctive layers over many similar layers.
+- Avoid extremely short loops unless they are masked by longer layers or intentionally rhythmic.
+- If a bed needs lots of motion, create that motion in the stem instead of forcing many live layer decoders to do all the work.
+
+Recommended File and Folder Conventions
+- Keep folder names stable.
+- Keep layer numbering stable and intentional.
+- Suggested stem naming pattern:
+  - Soundscapes/Stems/<bank>-stem.mp3
+- Suggested layer folder pattern:
+  - Soundscapes/<Bank Name>/1. <Layer Name>.mp3
+  - Soundscapes/<Bank Name>/2. <Layer Name>.mp3
+  - etc.
+- Use consistent capitalization and spacing.
+
+Implementation Handoff Checklist
+- For each bed, provide:
+  - display name
+  - stem file
+  - ordered layer files
+  - intended default layer balance
+  - exact loop duration
+  - channel format for each file
+  - any special notes about transients or spatial intent
+- For each solo loop, provide:
+  - display name
+  - file path
+  - mono or stereo note
+  - whether it is meant to be panned freely
+
+Recommended Export Workflow
+- Do editing and cleanup from original recordings in the DAW.
+- Keep archive masters as 48 kHz WAV.
+- Export final app assets from those masters, not from previous MP3 exports.
+- If you are only doing a quick test pass, MP3 delivery is fine.
+- If perfect gapless looping becomes critical later, revisit the delivery codec and/or the playback runtime.
+
+Final QA Checklist Before Hand-Off
+- 48000 Hz sample rate confirmed
+- correct mono/stereo channel format
+- exact intended duration confirmed
+- loop passes cleanly for repeated listening
+- no clipped peaks
+- no unintended silence at boundaries
+- no obvious clicks or loop seam thumps
+- layer order and naming are correct
+- bed stem matches the intended default blend
+- sounds acceptable on wired headphones, Bluetooth headphones, and phone speakers
+
+Short Version
+- Use 48 kHz throughout.
+- Keep one stem plus up to 6 synchronized layers per bed.
+- Make all layers in the same bed exactly the same length.
+- Leave headroom.
+- Loop carefully.
+- Prefer mono for panned assets and stereo for stems/spatial scenes.
+- Keep M/S masters.
+- Use binaural selectively.
+- Export app assets from clean masters, not from old MP3s.

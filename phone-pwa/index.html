@@ -31,7 +31,10 @@
                     <p class="eyebrow">Master Mix</p>
                     <h2>Overall balance</h2>
                 </div>
-                <button id="stop-all" class="pill-button" type="button" data-role="stop-all">Stop All</button>
+                <div class="section-actions">
+                    <button id="reset-all-sliders" class="pill-button" type="button">Reset Sliders</button>
+                    <button id="stop-all" class="pill-button" type="button" data-role="stop-all">Stop All</button>
+                </div>
             </div>
 
             <div class="preset-row" role="group" aria-label="Mix presets">
@@ -39,6 +42,26 @@
                 <button class="preset-chip" type="button" data-role="mix-preset" data-preset="focus" data-background="70" data-solo="54">Focus</button>
                 <button class="preset-chip" type="button" data-role="mix-preset" data-preset="detail" data-background="56" data-solo="72">Detail</button>
             </div>
+
+            <section class="saved-presets-panel" aria-labelledby="saved-presets-title">
+                <div class="saved-presets-heading">
+                    <div>
+                        <p class="eyebrow">Saved Mixes</p>
+                        <h3 id="saved-presets-title">Store named scenes</h3>
+                    </div>
+                    <span id="saved-preset-count" class="status-chip">0 saved</span>
+                </div>
+
+                <div class="preset-save-row">
+                    <label class="preset-name-field" for="preset-name">
+                        <span>Preset name</span>
+                        <input id="preset-name" type="text" maxlength="32" placeholder="Night rain + river">
+                    </label>
+                    <button id="save-preset" class="pill-button" type="button">Save Current</button>
+                </div>
+
+                <div id="custom-preset-list" class="saved-preset-list" aria-live="polite"></div>
+            </section>
 
             <div class="master-grid">
                 <label class="slider-stack" for="master-background">

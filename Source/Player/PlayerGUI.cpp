@@ -221,7 +221,6 @@ PlayerGUI::PlayerGUI()
 
     updateSelectedBackgroundBank(0);
     setAudioControlsEnabled(false);
-    startTimerHz(10);
 }
 
 PlayerGUI::~PlayerGUI()
@@ -232,6 +231,31 @@ PlayerGUI::~PlayerGUI()
 void PlayerGUI::setPlayer(Player* playerPtr)
 {
     player = playerPtr;
+
+    if (player != nullptr)
+    {
+        player->setGlobalBackgroundGain(cube(static_cast<float>(backgroundSoundsGlobalVolume.getValue())));
+        player->setGlobalForegroundGain(cube(static_cast<float>(foregroundSoundsGlobalVolume.getValue())));
+
+        for (int bankIndex = 0; bankIndex < Player::numBackgroundBanks; ++bankIndex)
+        {
+            player->setBackgroundBankGain(bankIndex, cube(static_cast<float>(backgroundSoundsBankVolume[bankIndex].getValue())));
+
+            for (int layerIndex = 0; layerIndex < Player::numBackgroundLayers; ++layerIndex)
+            {
+                player->setBackgroundLayerGain(bankIndex,
+                                               layerIndex,
+                                               cube(backgroundMixLevels[bankIndex][layerIndex]));
+            }
+        }
+
+        for (int soundIndex = 0; soundIndex < Player::numForegroundSounds; ++soundIndex)
+        {
+            player->setForegroundGain(soundIndex, cube(static_cast<float>(foregroundSoundsVolume[soundIndex].getValue())));
+            player->setForegroundPan(soundIndex, static_cast<float>(foregroundSoundsPan[soundIndex].getValue() / 100.0));
+        }
+    }
+
     updateLoadState();
     updateSectionButtonStates();
 }
@@ -337,36 +361,59 @@ void PlayerGUI::configureVerticalSlider(juce::Slider& slider)
 
 void PlayerGUI::updateLoadState()
 {
+    auto nextState = LoadState::NoPlayer;
+    auto nextText = juce::String("Preparing audio...");
+    auto nextColour = bodyColour;
+    auto shouldEnableControls = false;
+
     if (player == nullptr)
     {
-        loadStatusLabel.setColour(juce::Label::textColourId, bodyColour);
-        loadStatusLabel.setText("Preparing audio...", juce::dontSendNotification);
-        setAudioControlsEnabled(false);
-        repaint();
-        return;
+        nextState = LoadState::NoPlayer;
     }
-
-    if (player->didLoadFail())
+    else if (player->didLoadFail())
     {
-        loadStatusLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(0xA6, 0x33, 0x2A));
-        loadStatusLabel.setText("Audio library failed to load", juce::dontSendNotification);
-        setAudioControlsEnabled(false);
-        repaint();
-        return;
+        nextState = LoadState::Failed;
+        nextText = "Audio library failed to load";
+        nextColour = juce::Colour::fromRGB(0xA6, 0x33, 0x2A);
     }
-
-    if (player->isLoaded())
+    else if (player->isLoaded())
     {
-        loadStatusLabel.setColour(juce::Label::textColourId, juce::Colour::fromRGB(0x2D, 0x7A, 0x54));
-        loadStatusLabel.setText("Audio ready", juce::dontSendNotification);
-        setAudioControlsEnabled(true);
-        repaint();
+        nextState = LoadState::Ready;
+        nextText = "Audio ready";
+        nextColour = juce::Colour::fromRGB(0x2D, 0x7A, 0x54);
+        shouldEnableControls = true;
+    }
+    else if (player->isLoading())
+    {
+        nextState = LoadState::Loading;
+        nextText = "Loading sounds...";
+    }
+    else
+    {
+        nextState = LoadState::Preparing;
+    }
+
+    if (nextState == LoadState::Preparing || nextState == LoadState::Loading)
+    {
+        if (!isTimerRunning())
+        {
+            startTimerHz(10);
+        }
+    }
+    else
+    {
+        stopTimer();
+    }
+
+    if (nextState == loadState && shouldEnableControls == audioControlsEnabled)
+    {
         return;
     }
 
-    loadStatusLabel.setColour(juce::Label::textColourId, bodyColour);
-    loadStatusLabel.setText(player->isLoading() ? "Loading sounds..." : "Preparing audio...", juce::dontSendNotification);
-    setAudioControlsEnabled(false);
+    loadState = nextState;
+    loadStatusLabel.setColour(juce::Label::textColourId, nextColour);
+    loadStatusLabel.setText(nextText, juce::dontSendNotification);
+    setAudioControlsEnabled(shouldEnableControls);
     repaint();
 }
 
@@ -716,13 +763,13 @@ void PlayerGUI::sliderValueChanged(juce::Slider* slider)
 
     if (slider == &backgroundSoundsGlobalVolume)
     {
-        player->globalBackgroundSoundsGain = cube(static_cast<float>(backgroundSoundsGlobalVolume.getValue()));
+        player->setGlobalBackgroundGain(cube(static_cast<float>(backgroundSoundsGlobalVolume.getValue())));
         return;
     }
 
     if (slider == &foregroundSoundsGlobalVolume)
     {
-        player->globalForegroundSoundsGain = cube(static_cast<float>(foregroundSoundsGlobalVolume.getValue()));
+        player->setGlobalForegroundGain(cube(static_cast<float>(foregroundSoundsGlobalVolume.getValue())));
         return;
     }
 
@@ -732,25 +779,25 @@ void PlayerGUI::sliderValueChanged(juce::Slider* slider)
         {
             const auto value = static_cast<float>(backgroundSoundsIndividualVolume[i].getValue());
             backgroundMixLevels[selectedBackgroundBank][i] = value;
-            player->individualBackgroundSoundsGain[selectedBackgroundBank][i] = cube(value);
+            player->setBackgroundLayerGain(selectedBackgroundBank, i, cube(value));
             return;
         }
 
         if (slider == &backgroundSoundsBankVolume[i])
         {
-            player->bankBackgroundSoundsGain[i] = cube(static_cast<float>(backgroundSoundsBankVolume[i].getValue()));
+            player->setBackgroundBankGain(i, cube(static_cast<float>(backgroundSoundsBankVolume[i].getValue())));
             return;
         }
 
         if (slider == &foregroundSoundsVolume[i])
         {
-            player->individualForegroundSoundsGain[i] = cube(static_cast<float>(foregroundSoundsVolume[i].getValue()));
+            player->setForegroundGain(i, cube(static_cast<float>(foregroundSoundsVolume[i].getValue())));
             return;
         }
 
         if (slider == &foregroundSoundsPan[i])
         {
-            player->foregroundSoundsPan[i] = static_cast<float>(foregroundSoundsPan[i].getValue() / 100.0);
+            player->setForegroundPan(i, static_cast<float>(foregroundSoundsPan[i].getValue() / 100.0));
             return;
         }
     }

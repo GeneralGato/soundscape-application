@@ -39,6 +39,15 @@ private:
 		AdvancedForeground
 	};
 
+	enum class LoadState
+	{
+		NoPlayer,
+		Preparing,
+		Loading,
+		Ready,
+		Failed
+	};
+
 	using BackgroundMixLevels = std::array<std::array<float, Player::numBackgroundLayers>, Player::numBackgroundBanks>;
 
 	void timerCallback() override;
@@ -98,6 +107,7 @@ private:
 
 	BackgroundMixLevels backgroundMixLevels{};
 	ViewMode currentView{ ViewMode::MainMenu };
+	LoadState loadState{ LoadState::NoPlayer };
 	bool backgroundMenuExpanded = false;
 	bool foregroundMenuExpanded = false;
 	bool audioControlsEnabled = false;

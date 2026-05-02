@@ -1,16 +1,29 @@
 const query = new URLSearchParams(window.location.search);
 const isAndroidWrapper = query.get("wrapper") === "android";
 const storageKey = "soundscape-pocket-state-v1";
+const presetStorageKey = "soundscape-pocket-presets-v1";
 const resourceBase = isAndroidWrapper ? "./Resources" : "../Resources";
 const backgroundLayerBaseGain = 0.11;
 const soloBaseGain = 0.68;
 const defaultBackgroundLayerVolume = 100;
+const maxSavedPresets = 16;
+const toggleFadeSeconds = 1.0;
+const bankStemLoopSeconds = 180;
+const maxActiveStreamUnits = 16;
+const stemStreamUnits = 1;
+const soloStreamUnits = 1;
+const layerMixDeadband = 1.0;
+
+let mixPriorityCounter = 1;
 
 const bankDefinitions = [
     {
         id: "ambient",
         title: "Ambient",
         note: "Choir, piano, and synth textures.",
+        stemPath: "Soundscapes/Stems/ambient-stem.mp3",
+        stemGainCompensation: 6,
+        stemDurationSeconds: bankStemLoopSeconds,
         tracks: [
             "Soundscapes/Ambient/1. Bass.mp3",
             "Soundscapes/Ambient/2. Guitar.mp3",
@@ -24,6 +37,9 @@ const bankDefinitions = [
         id: "storm",
         title: "Rainy Day",
         note: "Rain, wind, and distant thunder.",
+        stemPath: "Soundscapes/Stems/storm-stem.mp3",
+        stemGainCompensation: 6,
+        stemDurationSeconds: bankStemLoopSeconds,
         tracks: [
             "Soundscapes/Storm/1. Light Rain.mp3",
             "Soundscapes/Storm/2. Breeze.mp3",
@@ -37,6 +53,9 @@ const bankDefinitions = [
         id: "beach",
         title: "Seaside",
         note: "Wind, waves, and gulls.",
+        stemPath: "Soundscapes/Stems/beach-stem.mp3",
+        stemGainCompensation: 6,
+        stemDurationSeconds: bankStemLoopSeconds,
         tracks: [
             "Soundscapes/Beach/1. Wind.mp3",
             "Soundscapes/Beach/2. Distant Waves.mp3",
@@ -50,6 +69,9 @@ const bankDefinitions = [
         id: "drone",
         title: "Drone",
         note: "Industrial hum and harmonic drone.",
+        stemPath: "Soundscapes/Stems/drone-stem.mp3",
+        stemGainCompensation: 6,
+        stemDurationSeconds: bankStemLoopSeconds,
         tracks: [
             "Soundscapes/Drone/6. Synth.mp3",
             "Soundscapes/Drone/1. Guitar Feedback.mp3",
@@ -63,6 +85,9 @@ const bankDefinitions = [
         id: "forest",
         title: "Forest",
         note: "Leaves, birdsong, and bees.",
+        stemPath: "Soundscapes/Stems/forest-stem.mp3",
+        stemGainCompensation: 6,
+        stemDurationSeconds: bankStemLoopSeconds,
         tracks: [
             "Soundscapes/Forest/1. Leaves.mp3",
             "Soundscapes/Forest/2. Leaves.mp3",
@@ -76,6 +101,9 @@ const bankDefinitions = [
         id: "field",
         title: "Summer Field",
         note: "Grass, cicadas, and evening insects.",
+        stemPath: "Soundscapes/Stems/field-stem.mp3",
+        stemGainCompensation: 6,
+        stemDurationSeconds: bankStemLoopSeconds,
         tracks: [
             "Soundscapes/Field/1. Grass Rustle.mp3",
             "Soundscapes/Field/2. Summer Wind.mp3",
@@ -100,6 +128,7 @@ const dom = {
     wakeButtons: Array.from(document.querySelectorAll("[data-role='wake-audio']")),
     statusText: document.querySelector("#status-text"),
     stopButtons: Array.from(document.querySelectorAll("[data-role='stop-all']")),
+    resetAllSlidersButton: document.querySelector("#reset-all-sliders"),
     masterBackground: document.querySelector("#master-background"),
     masterBackgroundReadout: document.querySelector("#master-background-readout"),
     masterSolo: document.querySelector("#master-solo"),
@@ -109,6 +138,10 @@ const dom = {
     bankCount: document.querySelector("#bank-count"),
     soloCount: document.querySelector("#solo-count"),
     presetButtons: Array.from(document.querySelectorAll("[data-role='mix-preset']")),
+    presetName: document.querySelector("#preset-name"),
+    savePresetButton: document.querySelector("#save-preset"),
+    customPresetList: document.querySelector("#custom-preset-list"),
+    savedPresetCount: document.querySelector("#saved-preset-count"),
     jumpSoundscapes: document.querySelector("#jump-soundscapes"),
     jumpSolos: document.querySelector("#jump-solos"),
     soundscapeSection: document.querySelector("#soundscape-section"),
@@ -116,6 +149,7 @@ const dom = {
 };
 
 let state = loadState();
+let savedPresets = loadSavedPresets();
 let audioContext = null;
 let backgroundBus = null;
 let soloBus = null;
@@ -123,6 +157,11 @@ let compressor = null;
 let masterBus = null;
 
 const trackEngines = new Map();
+const bankPlaybackStates = bankDefinitions.map(() => ({
+    activeMode: "none",
+    timelineSeconds: 0,
+    timelineContextTime: 0
+}));
 
 initialize();
 
@@ -134,6 +173,7 @@ function initialize() {
 
     renderBankCards();
     renderSoloCards();
+    renderSavedPresets();
     updateMasterReadouts();
     updateStatus();
 
@@ -157,10 +197,31 @@ function initialize() {
         });
     });
 
+    dom.resetAllSlidersButton.addEventListener("click", () => {
+        resetAllSliders();
+    });
+
     dom.presetButtons.forEach((button) => {
         button.addEventListener("click", () => {
             applyMixPreset(button);
         });
+    });
+
+    dom.presetName.addEventListener("input", () => {
+        updateSavePresetAvailability();
+    });
+
+    dom.presetName.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter") {
+            return;
+        }
+
+        event.preventDefault();
+        saveCurrentPreset();
+    });
+
+    dom.savePresetButton.addEventListener("click", () => {
+        saveCurrentPreset();
     });
 
     dom.jumpSoundscapes.addEventListener("click", () => {
@@ -173,6 +234,7 @@ function initialize() {
 
     syncWakeButtonState();
     updatePresetStates();
+    updateSavePresetAvailability();
 }
 
 function setMasterMix(backgroundValue, soloValue) {
@@ -190,6 +252,243 @@ function applyMixPreset(button) {
     const background = Number(button.dataset.background);
     const solo = Number(button.dataset.solo);
     setMasterMix(background, solo);
+}
+
+function createStateSnapshot(source = state) {
+    return {
+        masterBackground: source.masterBackground,
+        masterSolo: source.masterSolo,
+        banks: source.banks.map((bank) => ({
+            active: bank.active,
+            volume: bank.volume,
+            layerVolumes: [...bank.layerVolumes],
+            mixMode: bank.mixMode,
+            mixPriority: bank.mixPriority
+        })),
+        solos: source.solos.map((solo) => ({
+            active: solo.active,
+            volume: solo.volume,
+            pan: solo.pan
+        }))
+    };
+}
+
+function isDefaultLayerVolume(value) {
+    return Math.abs(value - defaultBackgroundLayerVolume) <= layerMixDeadband;
+}
+
+function areLayerVolumesDefault(layerVolumes) {
+    return layerVolumes.every((value) => isDefaultLayerVolume(value));
+}
+
+function getDesiredBankMixMode(bankState) {
+    return bankState.mixMode === "custom" ? "custom" : "stem";
+}
+
+function getNextMixPriority() {
+    mixPriorityCounter += 1;
+    return mixPriorityCounter;
+}
+
+function normalizeState(source, fallback = createDefaultState()) {
+    return {
+        masterBackground: clampNumber(source?.masterBackground, fallback.masterBackground, 0, 100),
+        masterSolo: clampNumber(source?.masterSolo, fallback.masterSolo, 0, 100),
+        banks: bankDefinitions.map((bank, index) => {
+            const layerVolumes = bank.tracks.map((_, layerIndex) => clampNumber(
+                source?.banks?.[index]?.layerVolumes?.[layerIndex],
+                fallback.banks[index].layerVolumes[layerIndex],
+                0,
+                100
+            ));
+            const desiredMixMode = source?.banks?.[index]?.mixMode === "custom" || !areLayerVolumesDefault(layerVolumes)
+                ? "custom"
+                : "stem";
+
+            const mixPriority = desiredMixMode === "custom"
+                ? clampNumber(source?.banks?.[index]?.mixPriority, fallback.banks[index].mixPriority, 0, Number.MAX_SAFE_INTEGER)
+                : 0;
+
+            mixPriorityCounter = Math.max(mixPriorityCounter, mixPriority || 0);
+
+            return {
+                active: Boolean(source?.banks?.[index]?.active),
+                volume: clampNumber(source?.banks?.[index]?.volume, fallback.banks[index].volume, 0, 100),
+                layerVolumes,
+                mixMode: desiredMixMode,
+                mixPriority
+            };
+        }),
+        solos: soloDefinitions.map((_, index) => ({
+            active: Boolean(source?.solos?.[index]?.active),
+            volume: clampNumber(source?.solos?.[index]?.volume, fallback.solos[index].volume, 0, 100),
+            pan: clampNumber(source?.solos?.[index]?.pan, fallback.solos[index].pan, -100, 100)
+        }))
+    };
+}
+
+function applyState(nextState) {
+    state = normalizeState(nextState);
+    persistState();
+    dom.masterBackground.value = String(state.masterBackground);
+    dom.masterSolo.value = String(state.masterSolo);
+    updateMasterReadouts();
+    updatePresetStates();
+    refreshCardStates();
+    syncPlayback();
+}
+
+function getPresetNameInputValue() {
+    return dom.presetName.value.trim().replace(/\s+/g, " ").slice(0, 32);
+}
+
+function updateSavePresetAvailability() {
+    dom.savePresetButton.disabled = getPresetNameInputValue().length === 0;
+}
+
+function createPresetId() {
+    if (window.crypto?.randomUUID) {
+        return window.crypto.randomUUID();
+    }
+
+    return `preset-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeSavedPreset(entry) {
+    const name = typeof entry?.name === "string" ? entry.name.trim().replace(/\s+/g, " ").slice(0, 32) : "";
+    if (!name) {
+        return null;
+    }
+
+    return {
+        id: typeof entry.id === "string" && entry.id ? entry.id : createPresetId(),
+        name,
+        updatedAt: typeof entry.updatedAt === "number" ? entry.updatedAt : Date.now(),
+        state: normalizeState(entry.state)
+    };
+}
+
+function loadSavedPresets() {
+    try {
+        const raw = window.localStorage.getItem(presetStorageKey);
+        if (!raw) {
+            return [];
+        }
+
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        return parsed
+            .map((entry) => normalizeSavedPreset(entry))
+            .filter(Boolean)
+            .sort((left, right) => right.updatedAt - left.updatedAt)
+            .slice(0, maxSavedPresets);
+    } catch (_error) {
+        return [];
+    }
+}
+
+function persistSavedPresets() {
+    window.localStorage.setItem(presetStorageKey, JSON.stringify(savedPresets));
+}
+
+function summarizePreset(savedPreset) {
+    const activeBanks = savedPreset.state.banks.filter((bank) => bank.active).length;
+    const activeSolos = savedPreset.state.solos.filter((solo) => solo.active).length;
+    return `${activeBanks} bed${activeBanks === 1 ? "" : "s"}, ${activeSolos} loop${activeSolos === 1 ? "" : "s"} · Mix ${savedPreset.state.masterBackground}/${savedPreset.state.masterSolo}`;
+}
+
+function renderSavedPresets() {
+    dom.savedPresetCount.textContent = `${savedPresets.length} saved`;
+
+    if (savedPresets.length === 0) {
+        dom.customPresetList.innerHTML = `
+            <div class="saved-preset-empty">
+                Save the current scene to keep your bank toggles, layer blend, solo levels, pan, and master mix together.
+            </div>
+        `;
+        return;
+    }
+
+    dom.customPresetList.innerHTML = savedPresets.map((savedPreset) => `
+        <article class="saved-preset-card" data-role="saved-preset-card" data-preset-id="${savedPreset.id}">
+            <div class="saved-preset-copy">
+                <strong>${escapeHtml(savedPreset.name)}</strong>
+                <p>${escapeHtml(summarizePreset(savedPreset))}</p>
+            </div>
+            <div class="saved-preset-actions">
+                <button class="preset-chip" type="button" data-role="custom-preset-load" data-preset-id="${savedPreset.id}">Load</button>
+                <button class="preset-chip saved-preset-delete" type="button" data-role="custom-preset-delete" data-preset-id="${savedPreset.id}">Delete</button>
+            </div>
+        </article>
+    `).join("");
+
+    dom.customPresetList.querySelectorAll("[data-role='custom-preset-load']").forEach((button) => {
+        button.addEventListener("click", () => {
+            loadSavedPreset(button.dataset.presetId);
+        });
+    });
+
+    dom.customPresetList.querySelectorAll("[data-role='custom-preset-delete']").forEach((button) => {
+        button.addEventListener("click", () => {
+            deleteSavedPreset(button.dataset.presetId);
+        });
+    });
+}
+
+function saveCurrentPreset() {
+    const name = getPresetNameInputValue();
+    if (!name) {
+        updateSavePresetAvailability();
+        return;
+    }
+
+    const existingIndex = savedPresets.findIndex((savedPreset) => savedPreset.name.toLowerCase() === name.toLowerCase());
+    const nextPreset = {
+        id: existingIndex >= 0 ? savedPresets[existingIndex].id : createPresetId(),
+        name,
+        updatedAt: Date.now(),
+        state: createStateSnapshot()
+    };
+
+    if (existingIndex >= 0) {
+        savedPresets.splice(existingIndex, 1);
+    }
+
+    savedPresets.unshift(nextPreset);
+    savedPresets = savedPresets.slice(0, maxSavedPresets);
+    persistSavedPresets();
+    renderSavedPresets();
+
+    dom.presetName.value = "";
+    updateSavePresetAvailability();
+    dom.statusText.textContent = `Saved preset: ${name}`;
+}
+
+function loadSavedPreset(presetId) {
+    const savedPreset = savedPresets.find((entry) => entry.id === presetId);
+    if (!savedPreset) {
+        return;
+    }
+
+    applyState(savedPreset.state);
+    dom.statusText.textContent = audioContext && audioContext.state === "running"
+        ? `Loaded preset: ${savedPreset.name}`
+        : `Loaded preset: ${savedPreset.name}. Tap Wake Audio to hear it.`;
+}
+
+function deleteSavedPreset(presetId) {
+    const presetIndex = savedPresets.findIndex((entry) => entry.id === presetId);
+    if (presetIndex < 0) {
+        return;
+    }
+
+    const [{ name }] = savedPresets.splice(presetIndex, 1);
+    persistSavedPresets();
+    renderSavedPresets();
+    dom.statusText.textContent = `Deleted preset: ${name}`;
 }
 
 function stopAllPlayback() {
@@ -229,9 +528,32 @@ function createDefaultState() {
         banks: bankDefinitions.map((bank) => ({
             active: false,
             volume: 70,
-            layerVolumes: bank.tracks.map(() => defaultBackgroundLayerVolume)
+            layerVolumes: bank.tracks.map(() => defaultBackgroundLayerVolume),
+            mixMode: "stem",
+            mixPriority: 0
         })),
         solos: soloDefinitions.map(() => ({ active: false, volume: 62, pan: 0 }))
+    };
+}
+
+function createSliderResetState(source = state) {
+    const defaults = createDefaultState();
+
+    return {
+        masterBackground: defaults.masterBackground,
+        masterSolo: defaults.masterSolo,
+        banks: source.banks.map((bank, index) => ({
+            ...bank,
+            volume: defaults.banks[index].volume,
+            layerVolumes: [...defaults.banks[index].layerVolumes],
+            mixMode: defaults.banks[index].mixMode,
+            mixPriority: defaults.banks[index].mixPriority
+        })),
+        solos: source.solos.map((solo, index) => ({
+            ...solo,
+            volume: defaults.solos[index].volume,
+            pan: defaults.solos[index].pan
+        }))
     };
 }
 
@@ -245,25 +567,7 @@ function loadState() {
         }
 
         const parsed = JSON.parse(raw);
-        return {
-            masterBackground: clampNumber(parsed.masterBackground, fallback.masterBackground, 0, 100),
-            masterSolo: clampNumber(parsed.masterSolo, fallback.masterSolo, 0, 100),
-            banks: bankDefinitions.map((bank, index) => ({
-                active: Boolean(parsed.banks?.[index]?.active),
-                volume: clampNumber(parsed.banks?.[index]?.volume, fallback.banks[index].volume, 0, 100),
-                layerVolumes: bank.tracks.map((_, layerIndex) => clampNumber(
-                    parsed.banks?.[index]?.layerVolumes?.[layerIndex],
-                    fallback.banks[index].layerVolumes[layerIndex],
-                    0,
-                    100
-                ))
-            })),
-            solos: soloDefinitions.map((_, index) => ({
-                active: Boolean(parsed.solos?.[index]?.active),
-                volume: clampNumber(parsed.solos?.[index]?.volume, fallback.solos[index].volume, 0, 100),
-                pan: clampNumber(parsed.solos?.[index]?.pan, fallback.solos[index].pan, -100, 100)
-            }))
-        };
+        return normalizeState(parsed, fallback);
     } catch (_error) {
         return fallback;
     }
@@ -288,6 +592,130 @@ function getTrackLabel(path) {
         .replace(/^\d+\.\s*/, "");
 }
 
+function getStemEngineKey(bankIndex) {
+    return `stem-${bankDefinitions[bankIndex].id}`;
+}
+
+function normalizeLoopPosition(seconds, durationSeconds) {
+    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+        return 0;
+    }
+
+    const normalized = seconds % durationSeconds;
+    return normalized < 0 ? normalized + durationSeconds : normalized;
+}
+
+function getBankTimelinePosition(bankIndex) {
+    const playbackState = bankPlaybackStates[bankIndex];
+    if (!audioContext || playbackState.activeMode === "none") {
+        return playbackState.timelineSeconds;
+    }
+
+    return normalizeLoopPosition(
+        playbackState.timelineSeconds + (audioContext.currentTime - playbackState.timelineContextTime),
+        bankDefinitions[bankIndex].stemDurationSeconds || bankStemLoopSeconds
+    );
+}
+
+function setBankTimelinePosition(bankIndex, seconds, mode) {
+    const playbackState = bankPlaybackStates[bankIndex];
+    playbackState.timelineSeconds = normalizeLoopPosition(
+        seconds,
+        bankDefinitions[bankIndex].stemDurationSeconds || bankStemLoopSeconds
+    );
+    playbackState.timelineContextTime = audioContext ? audioContext.currentTime : 0;
+    playbackState.activeMode = mode;
+}
+
+function getBankStemLevel(bankIndex) {
+    const bankLevel = (state.masterBackground / 100) * (state.banks[bankIndex].volume / 100) * backgroundLayerBaseGain;
+    return bankLevel * (bankDefinitions[bankIndex].stemGainCompensation || bankDefinitions[bankIndex].tracks.length);
+}
+
+function getBankLayerLevel(bankIndex, trackIndex) {
+    const bankLevel = (state.masterBackground / 100) * (state.banks[bankIndex].volume / 100) * backgroundLayerBaseGain;
+    return bankLevel * (state.banks[bankIndex].layerVolumes[trackIndex] / 100);
+}
+
+function bankHasStem(bankIndex) {
+    return Boolean(bankDefinitions[bankIndex].stemPath);
+}
+
+function computePlaybackPlan(nextState = state) {
+    const bankModes = nextState.banks.map((bank, index) => {
+        if (!bank.active) {
+            return "stem";
+        }
+
+        return bankHasStem(index) ? "stem" : "custom";
+    });
+
+    let totalUnits = nextState.solos.reduce((sum, solo) => sum + (solo.active ? soloStreamUnits : 0), 0);
+
+    nextState.banks.forEach((bank, index) => {
+        if (!bank.active) {
+            return;
+        }
+
+        totalUnits += bankHasStem(index) ? stemStreamUnits : bankDefinitions[index].tracks.length;
+    });
+
+    nextState.banks
+        .map((bank, index) => ({ bank, index }))
+        .filter(({ bank, index }) => bank.active && getDesiredBankMixMode(bank) === "custom" && bankHasStem(index))
+        .sort((left, right) => (right.bank.mixPriority || 0) - (left.bank.mixPriority || 0))
+        .forEach(({ index }) => {
+            const extraUnits = bankDefinitions[index].tracks.length - stemStreamUnits;
+            if (totalUnits + extraUnits <= maxActiveStreamUnits) {
+                bankModes[index] = "custom";
+                totalUnits += extraUnits;
+            }
+        });
+
+    return { bankModes, totalUnits };
+}
+
+function canApplyPlaybackState(nextState, rejectionMessage) {
+    const playbackPlan = computePlaybackPlan(nextState);
+    if (playbackPlan.totalUnits <= maxActiveStreamUnits) {
+        return true;
+    }
+
+    dom.statusText.textContent = `${rejectionMessage} ${playbackPlan.totalUnits}/${maxActiveStreamUnits} stream units would be active.`;
+    return false;
+}
+
+function createProjectedStateForBank(bankIndex, nextBankState) {
+    return {
+        ...state,
+        banks: state.banks.map((bank, index) => (index === bankIndex ? nextBankState : bank))
+    };
+}
+
+function createProjectedStateForSolo(soloIndex, nextSoloState) {
+    return {
+        ...state,
+        solos: state.solos.map((solo, index) => (index === soloIndex ? nextSoloState : solo))
+    };
+}
+
+function getBankSummaryLabel(bankState, resolvedMode) {
+    const desiredMode = getDesiredBankMixMode(bankState);
+    if (!bankState.active) {
+        return desiredMode === "custom" ? "Custom blend saved" : "Stem blend";
+    }
+
+    if (desiredMode === "custom" && resolvedMode === "custom") {
+        return "Custom layer blend";
+    }
+
+    if (desiredMode === "custom") {
+        return "Custom saved · stem live";
+    }
+
+    return "Stem blend";
+}
+
 function setBankMixerExpanded(card, expanded) {
     const toggle = card.querySelector("[data-role='bank-blend-toggle']");
     const mixer = card.querySelector("[data-role='bank-layer-mixer']");
@@ -300,6 +728,25 @@ function setBankMixerExpanded(card, expanded) {
     mixer.hidden = !expanded;
     toggle.setAttribute("aria-expanded", String(expanded));
     toggle.textContent = expanded ? "Hide layers" : "Blend layers";
+}
+
+function resetBankSliders(bankIndex) {
+    const defaults = createDefaultState().banks[bankIndex];
+    const nextBankState = {
+        ...state.banks[bankIndex],
+        volume: defaults.volume,
+        layerVolumes: [...defaults.layerVolumes],
+        mixMode: defaults.mixMode,
+        mixPriority: defaults.mixPriority
+    };
+
+    applyState(createProjectedStateForBank(bankIndex, nextBankState));
+    dom.statusText.textContent = `${bankDefinitions[bankIndex].title} sliders reset to defaults.`;
+}
+
+function resetAllSliders() {
+    applyState(createSliderResetState());
+    dom.statusText.textContent = "All sliders reset to default values.";
 }
 
 function renderBankCards() {
@@ -323,7 +770,10 @@ function renderBankCards() {
             </div>
             <div class="micro-row">
                 <span class="micro-copy" data-role="bank-layer-summary" data-index="${index}">6 looping layers</span>
-                <button class="status-chip blend-toggle" type="button" data-role="bank-blend-toggle" data-index="${index}" aria-expanded="false">Blend layers</button>
+                <div class="micro-actions">
+                    <button class="status-chip reset-chip" type="button" data-role="bank-reset" data-index="${index}">Reset bed</button>
+                    <button class="status-chip blend-toggle" type="button" data-role="bank-blend-toggle" data-index="${index}" aria-expanded="false">Blend layers</button>
+                </div>
             </div>
             <div class="layer-mixer" data-role="bank-layer-mixer" data-index="${index}" hidden>
                 ${bank.tracks.map((path, layerIndex) => `
@@ -345,7 +795,17 @@ function renderBankCards() {
         button.addEventListener("click", async () => {
             const index = Number(button.dataset.index);
             await ensureAudioReady();
-            state.banks[index].active = !state.banks[index].active;
+            const nextBankState = {
+                ...state.banks[index],
+                active: !state.banks[index].active
+            };
+
+            const projectedState = createProjectedStateForBank(index, nextBankState);
+            if (nextBankState.active && !canApplyPlaybackState(projectedState, "This phone is already at its stream budget.")) {
+                return;
+            }
+
+            state.banks[index] = nextBankState;
             persistState();
             syncPlayback();
             refreshCardStates();
@@ -360,6 +820,13 @@ function renderBankCards() {
             persistState();
             updateAllGains();
             refreshCardStates();
+        });
+    });
+
+    dom.bankGrid.querySelectorAll("[data-role='bank-reset']").forEach((button) => {
+        button.addEventListener("click", () => {
+            const index = Number(button.dataset.index);
+            resetBankSliders(index);
         });
     });
 
@@ -379,9 +846,24 @@ function renderBankCards() {
         slider.addEventListener("input", () => {
             const bankIndex = Number(slider.dataset.index);
             const layerIndex = Number(slider.dataset.layerIndex);
-            state.banks[bankIndex].layerVolumes[layerIndex] = Number(slider.value);
+            const nextLayerVolumes = [...state.banks[bankIndex].layerVolumes];
+            nextLayerVolumes[layerIndex] = Number(slider.value);
+
+            const nextMixMode = areLayerVolumesDefault(nextLayerVolumes) ? "stem" : "custom";
+            state.banks[bankIndex] = {
+                ...state.banks[bankIndex],
+                layerVolumes: nextLayerVolumes,
+                mixMode: nextMixMode,
+                mixPriority: nextMixMode === "custom" ? getNextMixPriority() : 0
+            };
+
             persistState();
-            updateAllGains();
+            const playbackPlan = computePlaybackPlan();
+            if (state.banks[bankIndex].active && nextMixMode === "custom" && playbackPlan.bankModes[bankIndex] !== "custom") {
+                dom.statusText.textContent = "Custom blend saved, but stem mode is live until some streams are turned off.";
+            }
+
+            syncPlayback();
             refreshCardStates();
         });
     });
@@ -424,7 +906,17 @@ function renderSoloCards() {
         button.addEventListener("click", async () => {
             const index = Number(button.dataset.index);
             await ensureAudioReady();
-            state.solos[index].active = !state.solos[index].active;
+            const nextSoloState = {
+                ...state.solos[index],
+                active: !state.solos[index].active
+            };
+
+            const projectedState = createProjectedStateForSolo(index, nextSoloState);
+            if (nextSoloState.active && !canApplyPlaybackState(projectedState, "This phone is already at its stream budget.")) {
+                return;
+            }
+
+            state.solos[index] = nextSoloState;
             persistState();
             syncPlayback();
             refreshCardStates();
@@ -456,6 +948,8 @@ function renderSoloCards() {
 }
 
 function refreshCardStates() {
+    const playbackPlan = computePlaybackPlan();
+
     document.querySelectorAll("[data-role='bank-card']").forEach((card) => {
         const index = Number(card.dataset.index);
         const config = state.banks[index];
@@ -463,15 +957,14 @@ function refreshCardStates() {
         const slider = card.querySelector("[data-role='bank-volume']");
         const readout = card.querySelector("[data-role='bank-volume-readout']");
         const summary = card.querySelector("[data-role='bank-layer-summary']");
+        const resolvedMode = playbackPlan.bankModes[index];
 
         card.classList.toggle("is-active", config.active);
         toggle.classList.toggle("is-active", config.active);
         toggle.dataset.stateLabel = config.active ? "Live" : "Standby";
         slider.value = String(config.volume);
         readout.textContent = `${config.volume}%`;
-
-        const isCustomBlend = config.layerVolumes.some((value) => value !== defaultBackgroundLayerVolume);
-        summary.textContent = isCustomBlend ? "Custom layer blend" : "6 looping layers";
+        summary.textContent = getBankSummaryLabel(config, resolvedMode);
 
         card.querySelectorAll("[data-role='bank-layer-volume']").forEach((layerSlider) => {
             const layerIndex = Number(layerSlider.dataset.layerIndex);
@@ -506,7 +999,8 @@ function refreshCardStates() {
 function updateCounts() {
     const activeBanks = state.banks.filter((bank) => bank.active).length;
     const activeSolos = state.solos.filter((solo) => solo.active).length;
-    dom.bankCount.textContent = `${activeBanks} active`;
+    const playbackPlan = computePlaybackPlan();
+    dom.bankCount.textContent = `${activeBanks} active · ${playbackPlan.totalUnits}/${maxActiveStreamUnits} units`;
     dom.soloCount.textContent = `${activeSolos} active`;
 }
 
@@ -584,6 +1078,8 @@ function getTrackEngine(key, path, options = {}) {
     const gainNode = audioContext.createGain();
     let panNode = null;
 
+    gainNode.gain.value = 0;
+
     sourceNode.connect(gainNode);
 
     if (options.allowPan && typeof audioContext.createStereoPanner === "function") {
@@ -594,9 +1090,113 @@ function getTrackEngine(key, path, options = {}) {
         gainNode.connect(options.allowPan ? soloBus : backgroundBus);
     }
 
-    const engine = { audio, gainNode, panNode };
+    const engine = {
+        audio,
+        gainNode,
+        panNode,
+        isFadingOut: false,
+        pauseTimeoutId: null
+    };
     trackEngines.set(key, engine);
     return engine;
+}
+
+function clearPendingPause(engine) {
+    if (engine.pauseTimeoutId !== null) {
+        window.clearTimeout(engine.pauseTimeoutId);
+        engine.pauseTimeoutId = null;
+    }
+}
+
+function scheduleGain(engine, targetGain, fadeSeconds = 0) {
+    if (!audioContext) {
+        return;
+    }
+
+    const now = audioContext.currentTime;
+    const parameter = engine.gainNode.gain;
+    const currentValue = parameter.value;
+    parameter.cancelScheduledValues(now);
+    parameter.setValueAtTime(currentValue, now);
+
+    if (fadeSeconds <= 0) {
+        parameter.setValueAtTime(targetGain, now);
+        return;
+    }
+
+    parameter.linearRampToValueAtTime(targetGain, now + fadeSeconds);
+}
+
+function startEnginePlayback(engine, targetGain, options = {}) {
+    clearPendingPause(engine);
+    engine.isFadingOut = false;
+
+    if (engine.audio.paused) {
+        if (Number.isFinite(options.syncTime) && Number.isFinite(engine.audio.duration) && engine.audio.duration > 0) {
+            engine.audio.currentTime = normalizeLoopPosition(options.syncTime, engine.audio.duration);
+        } else {
+            engine.audio.currentTime = 0;
+        }
+    }
+
+    playLoop(engine);
+    scheduleGain(engine, targetGain, toggleFadeSeconds);
+}
+
+function stopEnginePlayback(engine) {
+    clearPendingPause(engine);
+    engine.isFadingOut = true;
+    scheduleGain(engine, 0, toggleFadeSeconds);
+    engine.pauseTimeoutId = window.setTimeout(() => {
+        engine.audio.pause();
+        engine.pauseTimeoutId = null;
+        engine.isFadingOut = false;
+    }, toggleFadeSeconds * 1000);
+}
+
+function setImmediateGain(engine, targetGain) {
+    if (!audioContext) {
+        return;
+    }
+
+    if (engine.isFadingOut) {
+        return;
+    }
+
+    scheduleGain(engine, targetGain, 0.08);
+}
+
+function startStemPlayback(bankIndex, targetGain, syncTime) {
+    const engine = getTrackEngine(getStemEngineKey(bankIndex), bankDefinitions[bankIndex].stemPath);
+    startEnginePlayback(engine, targetGain, { syncTime });
+}
+
+function stopStemPlayback(bankIndex) {
+    const engineKey = getStemEngineKey(bankIndex);
+    if (!trackEngines.has(engineKey)) {
+        return;
+    }
+
+    stopEnginePlayback(trackEngines.get(engineKey));
+}
+
+function startLayerPlayback(bankIndex, syncTime) {
+    bankDefinitions[bankIndex].tracks.forEach((path, trackIndex) => {
+        const engineKey = `${bankDefinitions[bankIndex].id}-${trackIndex}`;
+        const engine = getTrackEngine(engineKey, path);
+        startEnginePlayback(engine, getBankLayerLevel(bankIndex, trackIndex), { syncTime });
+    });
+}
+
+function stopLayerPlayback(bankIndex) {
+    bankDefinitions[bankIndex].tracks.forEach((_, trackIndex) => {
+        const engineKey = `${bankDefinitions[bankIndex].id}-${trackIndex}`;
+        if (!trackEngines.has(engineKey)) {
+            return;
+        }
+
+        stopEnginePlayback(trackEngines.get(engineKey));
+    });
 }
 
 function syncPlayback() {
@@ -605,23 +1205,29 @@ function syncPlayback() {
         return;
     }
 
+    const playbackPlan = computePlaybackPlan();
+
     bankDefinitions.forEach((bank, bankIndex) => {
-        bank.tracks.forEach((path, trackIndex) => {
-            const engineKey = `${bank.id}-${trackIndex}`;
-            const shouldPlay = state.banks[bankIndex].active;
+        const bankState = state.banks[bankIndex];
+        const timelinePosition = getBankTimelinePosition(bankIndex);
 
-            if (!shouldPlay && !trackEngines.has(engineKey)) {
-                return;
-            }
+        if (!bankState.active) {
+            stopStemPlayback(bankIndex);
+            stopLayerPlayback(bankIndex);
+            setBankTimelinePosition(bankIndex, timelinePosition, "none");
+            return;
+        }
 
-            const engine = getTrackEngine(engineKey, path);
+        const resolvedMode = playbackPlan.bankModes[bankIndex];
+        if (resolvedMode === "custom") {
+            startLayerPlayback(bankIndex, timelinePosition);
+            stopStemPlayback(bankIndex);
+        } else {
+            startStemPlayback(bankIndex, getBankStemLevel(bankIndex), timelinePosition);
+            stopLayerPlayback(bankIndex);
+        }
 
-            if (shouldPlay) {
-                playLoop(engine);
-            } else {
-                engine.audio.pause();
-            }
-        });
+        setBankTimelinePosition(bankIndex, timelinePosition, resolvedMode);
     });
 
     soloDefinitions.forEach((solo, soloIndex) => {
@@ -634,13 +1240,14 @@ function syncPlayback() {
 
         const engine = getTrackEngine(engineKey, solo.path, { allowPan: true });
         if (shouldPlay) {
-            playLoop(engine);
+            const soloLevel = (state.masterSolo / 100) * (state.solos[soloIndex].volume / 100) * soloBaseGain;
+            startEnginePlayback(engine, soloLevel);
         } else {
-            engine.audio.pause();
+            stopEnginePlayback(engine);
         }
     });
 
-    updateAllGains();
+    updateAllGains(playbackPlan);
 }
 
 function playLoop(engine) {
@@ -652,13 +1259,19 @@ function playLoop(engine) {
     }
 }
 
-function updateAllGains() {
+function updateAllGains(playbackPlan = computePlaybackPlan()) {
     if (!audioContext) {
         return;
     }
 
     bankDefinitions.forEach((bank, bankIndex) => {
-        const bankLevel = (state.masterBackground / 100) * (state.banks[bankIndex].volume / 100) * backgroundLayerBaseGain;
+        const resolvedMode = playbackPlan.bankModes[bankIndex];
+        const stemEngineKey = getStemEngineKey(bankIndex);
+        if (trackEngines.has(stemEngineKey)) {
+            const stemEngine = trackEngines.get(stemEngineKey);
+            setImmediateGain(stemEngine, state.banks[bankIndex].active && resolvedMode === "stem" ? getBankStemLevel(bankIndex) : 0);
+        }
+
         bank.tracks.forEach((path, trackIndex) => {
             const engineKey = `${bank.id}-${trackIndex}`;
             if (!trackEngines.has(engineKey)) {
@@ -666,8 +1279,8 @@ function updateAllGains() {
             }
 
             const engine = getTrackEngine(engineKey, path);
-            const layerLevel = bankLevel * (state.banks[bankIndex].layerVolumes[trackIndex] / 100);
-            engine.gainNode.gain.value = state.banks[bankIndex].active ? layerLevel : 0;
+            const layerLevel = getBankLayerLevel(bankIndex, trackIndex);
+            setImmediateGain(engine, state.banks[bankIndex].active && resolvedMode === "custom" ? layerLevel : 0);
         });
     });
 
@@ -679,19 +1292,20 @@ function updateAllGains() {
         }
 
         const engine = getTrackEngine(engineKey, solo.path, { allowPan: true });
-        engine.gainNode.gain.value = state.solos[soloIndex].active ? soloLevel : 0;
+        setImmediateGain(engine, state.solos[soloIndex].active ? soloLevel : 0);
 
         if (engine.panNode) {
             engine.panNode.pan.value = state.solos[soloIndex].pan / 100;
         }
     });
 
-    updateStatus();
+    updateStatus(playbackPlan);
 }
 
-function updateStatus() {
+function updateStatus(playbackPlan = computePlaybackPlan()) {
     const activeBanks = state.banks.filter((bank) => bank.active).length;
     const activeSolos = state.solos.filter((solo) => solo.active).length;
+    const deferredCustomBeds = state.banks.filter((bank, index) => bank.active && getDesiredBankMixMode(bank) === "custom" && playbackPlan.bankModes[index] !== "custom").length;
 
     if (!audioContext) {
         dom.statusText.textContent = "Idle. Tap any card to start playback.";
@@ -708,5 +1322,19 @@ function updateStatus() {
         return;
     }
 
+    if (deferredCustomBeds > 0) {
+        dom.statusText.textContent = `${activeBanks} soundscape${activeBanks === 1 ? "" : "s"}, ${activeSolos} solo loop${activeSolos === 1 ? "" : "s"}, ${deferredCustomBeds} custom blend${deferredCustomBeds === 1 ? "" : "s"} saved in stem mode.`;
+        return;
+    }
+
     dom.statusText.textContent = `${activeBanks} soundscape${activeBanks === 1 ? "" : "s"} and ${activeSolos} solo loop${activeSolos === 1 ? "" : "s"} active.`;
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
 }
