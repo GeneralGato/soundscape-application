@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#efe2d2">
+    <title>Soundscape Pocket</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="app.css">
+</head>
+<body>
+    <div class="ambient-glow ambient-glow-one"></div>
+    <div class="ambient-glow ambient-glow-two"></div>
+
+    <main class="app-shell">
+        <section class="hero-card panel">
+            <div class="hero-copy">
+                <p class="eyebrow">Pocket Mix</p>
+                <h1>Soundscape Pocket</h1>
+                <p class="hero-text">Built for quick thumb mixing on your Redmi 13, with layered beds, solo loops, and zero network dependency.</p>
+            </div>
+            <div class="hero-actions">
+                <button id="unlock-audio" class="pill-button pill-button-strong" type="button" data-role="wake-audio">Wake Audio</button>
+                <p id="status-text" class="status-copy">Idle. Tap any card to start playback.</p>
+            </div>
+        </section>
+
+        <section id="master-section" class="panel master-panel section-panel">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Master Mix</p>
+                    <h2>Overall balance</h2>
+                </div>
+                <button id="stop-all" class="pill-button" type="button" data-role="stop-all">Stop All</button>
+            </div>
+
+            <div class="preset-row" role="group" aria-label="Mix presets">
+                <button class="preset-chip" type="button" data-role="mix-preset" data-preset="drift" data-background="84" data-solo="36">Drift</button>
+                <button class="preset-chip" type="button" data-role="mix-preset" data-preset="focus" data-background="70" data-solo="54">Focus</button>
+                <button class="preset-chip" type="button" data-role="mix-preset" data-preset="detail" data-background="56" data-solo="72">Detail</button>
+            </div>
+
+            <div class="master-grid">
+                <label class="slider-stack" for="master-background">
+                    <span>Soundscapes</span>
+                    <input id="master-background" type="range" min="0" max="100" step="1">
+                    <strong id="master-background-readout">72%</strong>
+                </label>
+
+                <label class="slider-stack" for="master-solo">
+                    <span>Solo Sounds</span>
+                    <input id="master-solo" type="range" min="0" max="100" step="1">
+                    <strong id="master-solo-readout">65%</strong>
+                </label>
+            </div>
+        </section>
+
+        <section id="soundscape-section" class="panel section-panel">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Soundscapes</p>
+                    <h2>Layered ambient beds</h2>
+                </div>
+                <span id="bank-count" class="status-chip">0 active</span>
+            </div>
+            <div id="bank-grid" class="card-grid"></div>
+        </section>
+
+        <section id="solo-section" class="panel section-panel">
+            <div class="section-heading">
+                <div>
+                    <p class="eyebrow">Solo Sounds</p>
+                    <h2>Foreground loops</h2>
+                </div>
+                <span id="solo-count" class="status-chip">0 active</span>
+            </div>
+            <div id="solo-grid" class="card-grid"></div>
+        </section>
+    </main>
+
+    <nav class="phone-dock" aria-label="Quick controls">
+        <button class="dock-button dock-button-primary" type="button" data-role="wake-audio">Wake</button>
+        <button class="dock-button dock-button-secondary" type="button" data-role="stop-all">Stop</button>
+        <button class="dock-button" type="button" id="jump-soundscapes">Beds</button>
+        <button class="dock-button" type="button" id="jump-solos">Loops</button>
+    </nav>
+
+    <script src="app.js"></script>
+</body>
+</html>

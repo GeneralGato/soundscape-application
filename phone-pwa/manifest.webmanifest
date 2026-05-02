@@ -1,0 +1,9 @@
+{
+  "name": "Soundscape Pocket",
+  "short_name": "Soundscape",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#efe2d2",
+  "theme_color": "#efe2d2",
+  "description": "Phone-first offline mix controls for the Soundscape Application."
+}
