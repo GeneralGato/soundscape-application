@@ -4,10 +4,33 @@
 namespace
 {
 constexpr int resourceSearchDepth = 8;
+constexpr auto manifestFileName = "asset-manifest.current.json";
 constexpr float defaultIndividualGain = 0.125f;
 constexpr float defaultPan = 0.5f;
 constexpr float defaultMixLevel = 0.125f;
 constexpr double parameterRampSeconds = 0.04;
+constexpr double playbackToggleRampSeconds = 1.0;
+constexpr float inactivePlaybackThreshold = 0.0005f;
+
+constexpr std::array<const char*, Player::numBackgroundBanks> legacyBackgroundBankNames =
+{
+    "Ambient",
+    "Rainy Day",
+    "Seaside",
+    "Drone",
+    "Forest",
+    "Summer Field"
+};
+
+constexpr std::array<const char*, Player::numForegroundSounds> legacyForegroundNames =
+{
+    "Light Stream",
+    "River",
+    "Waterfall",
+    "Campfire",
+    "Cat Purr",
+    "Crows"
+};
 
 float clampGain(float gain)
 {
@@ -30,9 +53,9 @@ float panToRightGain(float pan)
 }
 
 template <typename SmoothedValueType>
-void resetSmoothedValue(SmoothedValueType& value, double sampleRate, float currentValue)
+void resetSmoothedValue(SmoothedValueType& value, double sampleRate, float currentValue, double rampSeconds = parameterRampSeconds)
 {
-    value.reset(sampleRate, parameterRampSeconds);
+    value.reset(sampleRate, rampSeconds);
     value.setCurrentAndTargetValue(currentValue);
 }
 
@@ -76,16 +99,48 @@ juce::File findResourceRoot()
     return {};
 }
 
+std::string buildResourcePath(const juce::File& resourceRoot, const juce::String& relativePath)
+{
+    if (!resourceRoot.isDirectory() || relativePath.isEmpty())
+    {
+        return {};
+    }
+
+    return resourceRoot.getChildFile(relativePath).getFullPathName().toStdString();
+}
+
 std::string buildResourcePath(const juce::File& resourceRoot, const char* relativePath)
 {
-    return resourceRoot.getChildFile(relativePath).getFullPathName().toStdString();
+    return buildResourcePath(resourceRoot, juce::String(relativePath));
+}
+
+juce::String labelFromPath(const juce::String& relativePath)
+{
+    auto fileName = juce::File(relativePath).getFileNameWithoutExtension();
+    const auto separatorIndex = fileName.indexOf(". ");
+    if (separatorIndex >= 0)
+    {
+        fileName = fileName.substring(separatorIndex + 2);
+    }
+
+    return fileName;
+}
+
+juce::String readStringProperty(const juce::DynamicObject* object, const char* propertyName)
+{
+    if (object == nullptr)
+    {
+        return {};
+    }
+
+    return object->getProperty(propertyName).toString();
 }
 }
 
 Player::Player()
 {
-    initialiseDefaults();
     filePathStorage();
+    initialiseDefaults();
 }
 
 Player::~Player()
@@ -131,9 +186,19 @@ void Player::initialiseDefaults()
         state.store(false);
     }
 
+    for (auto& target : backgroundPlayTargets)
+    {
+        target.store(0.0f, std::memory_order_relaxed);
+    }
+
     for (auto& state : foregroundSoundEnabled)
     {
         state.store(false);
+    }
+
+    for (auto& target : foregroundPlayTargets)
+    {
+        target.store(0.0f, std::memory_order_relaxed);
     }
 
     for (int soundIndex = 0; soundIndex < numForegroundSounds; ++soundIndex)
@@ -147,6 +212,13 @@ void Player::initialiseDefaults()
 bool Player::isIndexValid(int index, int upperBound) const
 {
     return index >= 0 && index < upperBound;
+}
+
+bool Player::isBackgroundLayerIndexValid(int bankIndex, int layerIndex) const
+{
+    return isIndexValid(bankIndex, numBackgroundBanks)
+        && layerIndex >= 0
+        && layerIndex < backgroundLayerCounts[bankIndex];
 }
 
 void Player::loadAsync()
@@ -184,6 +256,7 @@ void Player::setBackgroundBankPlaying(int bankIndex, bool newState)
     if (isIndexValid(bankIndex, numBackgroundBanks))
     {
         backgroundBankEnabled[bankIndex].store(newState);
+        backgroundPlayTargets[bankIndex].store(newState ? 1.0f : 0.0f, std::memory_order_relaxed);
     }
 }
 
@@ -192,6 +265,7 @@ void Player::setForegroundSoundPlaying(int soundIndex, bool newState)
     if (isIndexValid(soundIndex, numForegroundSounds))
     {
         foregroundSoundEnabled[soundIndex].store(newState);
+        foregroundPlayTargets[soundIndex].store(newState ? 1.0f : 0.0f, std::memory_order_relaxed);
     }
 }
 
@@ -235,7 +309,7 @@ void Player::setGlobalForegroundGain(float gain)
 
 void Player::setBackgroundLayerGain(int bankIndex, int layerIndex, float gain)
 {
-    if (!isIndexValid(bankIndex, numBackgroundBanks) || !isIndexValid(layerIndex, numBackgroundLayers))
+    if (!isBackgroundLayerIndexValid(bankIndex, layerIndex))
     {
         return;
     }
@@ -273,6 +347,46 @@ void Player::setForegroundPan(int soundIndex, float pan)
     storeForegroundPanTargets(soundIndex, pan);
 }
 
+juce::String Player::getBackgroundBankName(int bankIndex) const
+{
+    if (!isIndexValid(bankIndex, numBackgroundBanks))
+    {
+        return {};
+    }
+
+    return backgroundBankNames[bankIndex];
+}
+
+juce::String Player::getForegroundSoundName(int soundIndex) const
+{
+    if (!isIndexValid(soundIndex, numForegroundSounds))
+    {
+        return {};
+    }
+
+    return foregroundSoundNames[soundIndex];
+}
+
+int Player::getBackgroundLayerCount(int bankIndex) const
+{
+    if (!isIndexValid(bankIndex, numBackgroundBanks))
+    {
+        return 0;
+    }
+
+    return backgroundLayerCounts[bankIndex];
+}
+
+juce::String Player::getBackgroundLayerName(int bankIndex, int layerIndex) const
+{
+    if (!isBackgroundLayerIndexValid(bankIndex, layerIndex))
+    {
+        return {};
+    }
+
+    return backgroundLayerNames[bankIndex][layerIndex];
+}
+
 void Player::initialiseSmoothing(double sampleRate)
 {
     resetSmoothedValue(globalBackgroundGain,
@@ -287,8 +401,12 @@ void Player::initialiseSmoothing(double sampleRate)
         resetSmoothedValue(backgroundBankGains[bankIndex],
                            sampleRate,
                            backgroundBankGainTargets[bankIndex].load(std::memory_order_relaxed));
+        resetSmoothedValue(backgroundPlayGains[bankIndex],
+                           sampleRate,
+                           backgroundPlayTargets[bankIndex].load(std::memory_order_relaxed),
+                           playbackToggleRampSeconds);
 
-        for (int layerIndex = 0; layerIndex < numBackgroundLayers; ++layerIndex)
+        for (int layerIndex = 0; layerIndex < maxBackgroundLayers; ++layerIndex)
         {
             resetSmoothedValue(backgroundLayerGains[bankIndex][layerIndex],
                                sampleRate,
@@ -301,6 +419,10 @@ void Player::initialiseSmoothing(double sampleRate)
         resetSmoothedValue(foregroundGains[soundIndex],
                            sampleRate,
                            foregroundGainTargets[soundIndex].load(std::memory_order_relaxed));
+        resetSmoothedValue(foregroundPlayGains[soundIndex],
+                           sampleRate,
+                           foregroundPlayTargets[soundIndex].load(std::memory_order_relaxed),
+                           playbackToggleRampSeconds);
         resetSmoothedValue(foregroundLeftPanGains[soundIndex],
                            sampleRate,
                            foregroundLeftPanTargets[soundIndex].load(std::memory_order_relaxed));
@@ -318,8 +440,9 @@ void Player::updateSmoothedTargets()
     for (int bankIndex = 0; bankIndex < numBackgroundBanks; ++bankIndex)
     {
         backgroundBankGains[bankIndex].setTargetValue(backgroundBankGainTargets[bankIndex].load(std::memory_order_relaxed));
+        backgroundPlayGains[bankIndex].setTargetValue(backgroundPlayTargets[bankIndex].load(std::memory_order_relaxed));
 
-        for (int layerIndex = 0; layerIndex < numBackgroundLayers; ++layerIndex)
+        for (int layerIndex = 0; layerIndex < maxBackgroundLayers; ++layerIndex)
         {
             backgroundLayerGains[bankIndex][layerIndex].setTargetValue(backgroundLayerGainTargets[bankIndex][layerIndex].load(std::memory_order_relaxed));
         }
@@ -328,6 +451,7 @@ void Player::updateSmoothedTargets()
     for (int soundIndex = 0; soundIndex < numForegroundSounds; ++soundIndex)
     {
         foregroundGains[soundIndex].setTargetValue(foregroundGainTargets[soundIndex].load(std::memory_order_relaxed));
+        foregroundPlayGains[soundIndex].setTargetValue(foregroundPlayTargets[soundIndex].load(std::memory_order_relaxed));
         foregroundLeftPanGains[soundIndex].setTargetValue(foregroundLeftPanTargets[soundIndex].load(std::memory_order_relaxed));
         foregroundRightPanGains[soundIndex].setTargetValue(foregroundRightPanTargets[soundIndex].load(std::memory_order_relaxed));
     }
@@ -337,14 +461,15 @@ void Player::snapInactiveParameters()
 {
     for (int bankIndex = 0; bankIndex < numBackgroundBanks; ++bankIndex)
     {
-        if (backgroundBankEnabled[bankIndex].load(std::memory_order_relaxed))
+        if (backgroundBankEnabled[bankIndex].load(std::memory_order_relaxed)
+            || backgroundPlayGains[bankIndex].getCurrentValue() > inactivePlaybackThreshold)
         {
             continue;
         }
 
         backgroundBankGains[bankIndex].setCurrentAndTargetValue(backgroundBankGainTargets[bankIndex].load(std::memory_order_relaxed));
 
-        for (int layerIndex = 0; layerIndex < numBackgroundLayers; ++layerIndex)
+        for (int layerIndex = 0; layerIndex < maxBackgroundLayers; ++layerIndex)
         {
             backgroundLayerGains[bankIndex][layerIndex].setCurrentAndTargetValue(backgroundLayerGainTargets[bankIndex][layerIndex].load(std::memory_order_relaxed));
         }
@@ -352,7 +477,8 @@ void Player::snapInactiveParameters()
 
     for (int soundIndex = 0; soundIndex < numForegroundSounds; ++soundIndex)
     {
-        if (foregroundSoundEnabled[soundIndex].load(std::memory_order_relaxed))
+        if (foregroundSoundEnabled[soundIndex].load(std::memory_order_relaxed)
+            || foregroundPlayGains[soundIndex].getCurrentValue() > inactivePlaybackThreshold)
         {
             continue;
         }
@@ -384,14 +510,16 @@ void Player::renderNextBlock(float* leftChannel, float* rightChannel, int numSam
         for (int bankIndex = 0; bankIndex < numBackgroundBanks; ++bankIndex)
         {
             const auto currentBankGain = backgroundBankGains[bankIndex].getNextValue();
-            if (!backgroundBankEnabled[bankIndex].load(std::memory_order_relaxed))
+            const auto currentPlayGain = backgroundPlayGains[bankIndex].getNextValue();
+            if (!backgroundBankEnabled[bankIndex].load(std::memory_order_relaxed)
+                && currentPlayGain <= inactivePlaybackThreshold)
             {
                 continue;
             }
 
             float bankOutput = 0.0f;
 
-            for (int layerIndex = 0; layerIndex < numBackgroundLayers; ++layerIndex)
+            for (int layerIndex = 0; layerIndex < backgroundLayerCounts[bankIndex]; ++layerIndex)
             {
                 const auto currentLayerGain = backgroundLayerGains[bankIndex][layerIndex].getNextValue();
                 auto& buffer = backgroundBuffers[bankIndex][layerIndex];
@@ -411,7 +539,7 @@ void Player::renderNextBlock(float* leftChannel, float* rightChannel, int numSam
                 }
             }
 
-            backgroundOutput += bankOutput * currentBankGain;
+            backgroundOutput += bankOutput * currentBankGain * currentPlayGain;
         }
 
         backgroundOutput *= currentGlobalBackgroundGain;
@@ -423,10 +551,12 @@ void Player::renderNextBlock(float* leftChannel, float* rightChannel, int numSam
         for (int soundIndex = 0; soundIndex < numForegroundSounds; ++soundIndex)
         {
             const auto currentForegroundGain = foregroundGains[soundIndex].getNextValue();
+            const auto currentPlayGain = foregroundPlayGains[soundIndex].getNextValue();
             const auto currentLeftPanGain = foregroundLeftPanGains[soundIndex].getNextValue();
             const auto currentRightPanGain = foregroundRightPanGains[soundIndex].getNextValue();
 
-            if (!foregroundSoundEnabled[soundIndex].load(std::memory_order_relaxed))
+            if (!foregroundSoundEnabled[soundIndex].load(std::memory_order_relaxed)
+                && currentPlayGain <= inactivePlaybackThreshold)
             {
                 continue;
             }
@@ -446,7 +576,7 @@ void Player::renderNextBlock(float* leftChannel, float* rightChannel, int numSam
                 position = 0;
             }
 
-            sample *= currentForegroundGain * currentGlobalForegroundGain;
+            sample *= currentForegroundGain * currentGlobalForegroundGain * currentPlayGain;
 
             leftOutput += sample * currentLeftPanGain;
             rightOutput += sample * currentRightPanGain;
@@ -513,7 +643,7 @@ bool Player::load()
 
     for (int bankIndex = 0; bankIndex < numBackgroundBanks; ++bankIndex)
     {
-        for (int layerIndex = 0; layerIndex < numBackgroundLayers; ++layerIndex)
+        for (int layerIndex = 0; layerIndex < backgroundLayerCounts[bankIndex]; ++layerIndex)
         {
             const auto file = juce::File(backgroundFilePathStorage[bankIndex][layerIndex]);
             if (!file.existsAsFile())
@@ -528,6 +658,12 @@ bool Player::load()
                 return false;
             }
 
+            backgroundPositions[bankIndex][layerIndex] = 0;
+        }
+
+        for (int layerIndex = backgroundLayerCounts[bankIndex]; layerIndex < maxBackgroundLayers; ++layerIndex)
+        {
+            backgroundBuffers[bankIndex][layerIndex].setSize(0, 0);
             backgroundPositions[bankIndex][layerIndex] = 0;
         }
     }
@@ -556,11 +692,20 @@ bool Player::load()
 void Player::filePathStorage()
 {
     auto resourceRoot = findResourceRoot();
-    if (!resourceRoot.isDirectory())
+
+    backgroundLayerCounts.fill(0);
+    for (int bankIndex = 0; bankIndex < numBackgroundBanks; ++bankIndex)
     {
-        DBG("Resources directory was not found.");
-        return;
+        backgroundBankNames[bankIndex].clear();
+        for (int layerIndex = 0; layerIndex < maxBackgroundLayers; ++layerIndex)
+        {
+            backgroundFilePathStorage[bankIndex][layerIndex].clear();
+            backgroundLayerNames[bankIndex][layerIndex].clear();
+        }
     }
+
+    foregroundFilePathStorage.fill({});
+    foregroundSoundNames.fill({});
 
     static constexpr const char* backgroundRelativePaths[][6] =
     {
@@ -614,14 +759,6 @@ void Player::filePathStorage()
         }
     };
 
-    for (int bankIndex = 0; bankIndex < numBackgroundBanks; ++bankIndex)
-    {
-        for (int layerIndex = 0; layerIndex < numBackgroundLayers; ++layerIndex)
-        {
-            backgroundFilePathStorage[bankIndex][layerIndex] = buildResourcePath(resourceRoot, backgroundRelativePaths[bankIndex][layerIndex]);
-        }
-    }
-
     static constexpr const char* foregroundRelativePaths[] =
     {
         "1. Light Stream.mp3",
@@ -632,8 +769,128 @@ void Player::filePathStorage()
         "6. Crows.mp3"
     };
 
-    for (int soundIndex = 0; soundIndex < numForegroundSounds; ++soundIndex)
+    auto loadLegacyDefinitions = [this, &resourceRoot]()
     {
-        foregroundFilePathStorage[soundIndex] = buildResourcePath(resourceRoot, foregroundRelativePaths[soundIndex]);
+        for (int bankIndex = 0; bankIndex < numBackgroundBanks; ++bankIndex)
+        {
+            backgroundBankNames[bankIndex] = legacyBackgroundBankNames[bankIndex];
+            backgroundLayerCounts[bankIndex] = 6;
+
+            for (int layerIndex = 0; layerIndex < backgroundLayerCounts[bankIndex]; ++layerIndex)
+            {
+                const auto relativePath = juce::String(backgroundRelativePaths[bankIndex][layerIndex]);
+                backgroundFilePathStorage[bankIndex][layerIndex] = buildResourcePath(resourceRoot, relativePath);
+                backgroundLayerNames[bankIndex][layerIndex] = labelFromPath(relativePath);
+            }
+        }
+
+        for (int soundIndex = 0; soundIndex < numForegroundSounds; ++soundIndex)
+        {
+            foregroundFilePathStorage[soundIndex] = buildResourcePath(resourceRoot, foregroundRelativePaths[soundIndex]);
+            foregroundSoundNames[soundIndex] = legacyForegroundNames[soundIndex];
+        }
+    };
+
+    if (resourceRoot.isDirectory())
+    {
+        auto manifestFile = resourceRoot.getChildFile(manifestFileName);
+        if (manifestFile.existsAsFile())
+        {
+            auto manifestRoot = juce::JSON::parse(manifestFile.loadFileAsString());
+            auto* manifestObject = manifestRoot.getDynamicObject();
+            auto* beds = manifestObject != nullptr ? manifestObject->getProperty("beds").getArray() : nullptr;
+            auto* solos = manifestObject != nullptr ? manifestObject->getProperty("soloLoops").getArray() : nullptr;
+            bool manifestLoaded = beds != nullptr && solos != nullptr
+                && beds->size() >= numBackgroundBanks
+                && solos->size() >= numForegroundSounds;
+
+            if (manifestLoaded)
+            {
+                for (int bankIndex = 0; bankIndex < numBackgroundBanks && manifestLoaded; ++bankIndex)
+                {
+                    auto* bedObject = beds->getReference(bankIndex).getDynamicObject();
+                    auto* deliveryObject = bedObject != nullptr ? bedObject->getProperty("delivery").getDynamicObject() : nullptr;
+                    auto* customLayers = deliveryObject != nullptr ? deliveryObject->getProperty("customLayers").getArray() : nullptr;
+                    if (bedObject == nullptr || customLayers == nullptr || customLayers->isEmpty())
+                    {
+                        manifestLoaded = false;
+                        break;
+                    }
+
+                    backgroundBankNames[bankIndex] = readStringProperty(bedObject, "displayName");
+                    if (backgroundBankNames[bankIndex].isEmpty())
+                    {
+                        backgroundBankNames[bankIndex] = legacyBackgroundBankNames[bankIndex];
+                    }
+
+                    backgroundLayerCounts[bankIndex] = juce::jmin(static_cast<int>(customLayers->size()), maxBackgroundLayers);
+                    if (static_cast<int>(customLayers->size()) > maxBackgroundLayers)
+                    {
+                        DBG("A background bank has more layers than the current desktop mixer can expose. Extra layers are ignored.");
+                    }
+
+                    for (int layerIndex = 0; layerIndex < backgroundLayerCounts[bankIndex]; ++layerIndex)
+                    {
+                        auto* layerObject = customLayers->getReference(layerIndex).getDynamicObject();
+                        if (layerObject == nullptr)
+                        {
+                            manifestLoaded = false;
+                            break;
+                        }
+
+                        auto relativePath = readStringProperty(layerObject, "path");
+                        if (relativePath.isEmpty())
+                        {
+                            manifestLoaded = false;
+                            break;
+                        }
+
+                        backgroundFilePathStorage[bankIndex][layerIndex] = buildResourcePath(resourceRoot, relativePath);
+                        backgroundLayerNames[bankIndex][layerIndex] = readStringProperty(layerObject, "displayName");
+                        if (backgroundLayerNames[bankIndex][layerIndex].isEmpty())
+                        {
+                            backgroundLayerNames[bankIndex][layerIndex] = labelFromPath(relativePath);
+                        }
+                    }
+                }
+
+                for (int soundIndex = 0; soundIndex < numForegroundSounds && manifestLoaded; ++soundIndex)
+                {
+                    auto* soloObject = solos->getReference(soundIndex).getDynamicObject();
+                    if (soloObject == nullptr)
+                    {
+                        manifestLoaded = false;
+                        break;
+                    }
+
+                    auto relativePath = readStringProperty(soloObject, "deliveryPath");
+                    if (relativePath.isEmpty())
+                    {
+                        manifestLoaded = false;
+                        break;
+                    }
+
+                    foregroundFilePathStorage[soundIndex] = buildResourcePath(resourceRoot, relativePath);
+                    foregroundSoundNames[soundIndex] = readStringProperty(soloObject, "displayName");
+                    if (foregroundSoundNames[soundIndex].isEmpty())
+                    {
+                        foregroundSoundNames[soundIndex] = legacyForegroundNames[soundIndex];
+                    }
+                }
+
+                if (manifestLoaded)
+                {
+                    return;
+                }
+            }
+
+            DBG("Manifest was not usable for the desktop player. Falling back to legacy library definitions.");
+        }
     }
+    else
+    {
+        DBG("Resources directory was not found. Falling back to legacy library definitions.");
+    }
+
+    loadLegacyDefinitions();
 }

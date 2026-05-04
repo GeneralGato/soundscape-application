@@ -9,7 +9,7 @@ class Player
 {
 public:
 	static constexpr int numBackgroundBanks = 6;
-	static constexpr int numBackgroundLayers = 6;
+	static constexpr int maxBackgroundLayers = 12;
 	static constexpr int numForegroundSounds = 6;
 
 	struct StereoFrame
@@ -18,8 +18,10 @@ public:
 		float right = 0.0f;
 	};
 
-	using BackgroundLayerGains = std::array<std::array<float, numBackgroundLayers>, numBackgroundBanks>;
-	using BackgroundPathGrid = std::array<std::array<std::string, numBackgroundLayers>, numBackgroundBanks>;
+	using BackgroundLayerGains = std::array<std::array<float, maxBackgroundLayers>, numBackgroundBanks>;
+	using BackgroundPathGrid = std::array<std::array<std::string, maxBackgroundLayers>, numBackgroundBanks>;
+	using BackgroundLayerCountStorage = std::array<int, numBackgroundBanks>;
+	using BackgroundLayerNameGrid = std::array<std::array<juce::String, maxBackgroundLayers>, numBackgroundBanks>;
 
 	/** Constructor for the initialisation of Player */
 	Player();
@@ -87,29 +89,50 @@ public:
 	/** Updates the stereo pan for one foreground sound */
 	void setForegroundPan(int soundIndex, float pan);
 
+	/** Returns the current label for a background bank */
+	juce::String getBackgroundBankName(int bankIndex) const;
+
+	/** Returns the current label for a foreground sound */
+	juce::String getForegroundSoundName(int soundIndex) const;
+
+	/** Returns the active layer count for a background bank */
+	int getBackgroundLayerCount(int bankIndex) const;
+
+	/** Returns the current label for one layer in a background bank */
+	juce::String getBackgroundLayerName(int bankIndex, int layerIndex) const;
+
 	/** String storage of background sounds file paths */
 	BackgroundPathGrid backgroundFilePathStorage{};
+	BackgroundLayerCountStorage backgroundLayerCounts{};
+	BackgroundLayerNameGrid backgroundLayerNames{};
+	std::array<juce::String, numBackgroundBanks> backgroundBankNames{};
 
 	/** String storage of foreground sounds file paths */
 	std::array<std::string, numForegroundSounds> foregroundFilePathStorage{};
+	std::array<juce::String, numForegroundSounds> foregroundSoundNames{};
 
 private:
 	using SmoothedFloat = juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear>;
-	using AtomicBackgroundLayerGains = std::array<std::array<std::atomic<float>, numBackgroundLayers>, numBackgroundBanks>;
+	using AtomicBackgroundLayerGains = std::array<std::array<std::atomic<float>, maxBackgroundLayers>, numBackgroundBanks>;
 	using AtomicBackgroundBankGains = std::array<std::atomic<float>, numBackgroundBanks>;
 	using AtomicForegroundGains = std::array<std::atomic<float>, numForegroundSounds>;
-	using SmoothedBackgroundLayerGains = std::array<std::array<SmoothedFloat, numBackgroundLayers>, numBackgroundBanks>;
+	using AtomicBackgroundPlayTargets = std::array<std::atomic<float>, numBackgroundBanks>;
+	using AtomicForegroundPlayTargets = std::array<std::atomic<float>, numForegroundSounds>;
+	using SmoothedBackgroundLayerGains = std::array<std::array<SmoothedFloat, maxBackgroundLayers>, numBackgroundBanks>;
 	using SmoothedBackgroundBankGains = std::array<SmoothedFloat, numBackgroundBanks>;
 	using SmoothedForegroundGains = std::array<SmoothedFloat, numForegroundSounds>;
+	using SmoothedBackgroundPlayGains = std::array<SmoothedFloat, numBackgroundBanks>;
+	using SmoothedForegroundPlayGains = std::array<SmoothedFloat, numForegroundSounds>;
 	using SmoothedPanGains = std::array<SmoothedFloat, numForegroundSounds>;
 	using BackgroundEnableStates = std::array<std::atomic<bool>, numBackgroundBanks>;
 	using ForegroundEnableStates = std::array<std::atomic<bool>, numForegroundSounds>;
-	using BackgroundPositions = std::array<std::array<unsigned int, numBackgroundLayers>, numBackgroundBanks>;
+	using BackgroundPositions = std::array<std::array<unsigned int, maxBackgroundLayers>, numBackgroundBanks>;
 	using ForegroundPositions = std::array<unsigned int, numForegroundSounds>;
-	using BackgroundBuffers = std::array<std::array<juce::AudioBuffer<float>, numBackgroundLayers>, numBackgroundBanks>;
+	using BackgroundBuffers = std::array<std::array<juce::AudioBuffer<float>, maxBackgroundLayers>, numBackgroundBanks>;
 	using ForegroundBuffers = std::array<juce::AudioBuffer<float>, numForegroundSounds>;
 
 	bool isIndexValid(int index, int upperBound) const;
+	bool isBackgroundLayerIndexValid(int bankIndex, int layerIndex) const;
 	void initialiseDefaults();
 	void initialiseSmoothing(double sampleRate);
 	void updateSmoothedTargets();
@@ -140,6 +163,8 @@ private:
 	AtomicBackgroundLayerGains backgroundLayerGainTargets{};
 	AtomicBackgroundBankGains backgroundBankGainTargets{};
 	AtomicForegroundGains foregroundGainTargets{};
+	AtomicBackgroundPlayTargets backgroundPlayTargets{};
+	AtomicForegroundPlayTargets foregroundPlayTargets{};
 	AtomicForegroundGains foregroundLeftPanTargets{};
 	AtomicForegroundGains foregroundRightPanTargets{};
 	SmoothedFloat globalBackgroundGain{};
@@ -147,6 +172,8 @@ private:
 	SmoothedBackgroundLayerGains backgroundLayerGains{};
 	SmoothedBackgroundBankGains backgroundBankGains{};
 	SmoothedForegroundGains foregroundGains{};
+	SmoothedBackgroundPlayGains backgroundPlayGains{};
+	SmoothedForegroundPlayGains foregroundPlayGains{};
 	SmoothedPanGains foregroundLeftPanGains{};
 	SmoothedPanGains foregroundRightPanGains{};
 	double currentSampleRate = 44100.0;

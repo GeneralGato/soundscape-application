@@ -3,7 +3,7 @@
 //==============================================================================
 MainComponent::MainComponent(Processor& a)
 {
-    setSize(392, 680);
+    setSize(1400, 980);
     DBG("Output");
     
     //Sets instances of PlayerGUI in our main window

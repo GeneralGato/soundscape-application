@@ -1,121 +1,193 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include <array>
+#include <vector>
+
 #include "Player.h"
 
-class PlayerGUI :	public juce::Component,
-					public juce::Button::Listener,
-					public juce::Slider::Listener,
-					private juce::Timer
+class PlayerGUI : public juce::Component,
+                  public juce::Button::Listener,
+                  public juce::Slider::Listener,
+                  public juce::ListBoxModel,
+                  private juce::Timer
 {
 public:
-	/** Constructor for the PlayerGUI class */
-	PlayerGUI();
+    PlayerGUI();
+    ~PlayerGUI() override;
 
-	/** Destructor for the PlayerGUI class */
-	~PlayerGUI() override;
+    void setPlayer(Player* playerPtr);
 
-	/** Sets the Player for this GUI object to control */
-	void setPlayer(Player* playerPtr);
+    void paint(juce::Graphics& g) override;
+    void resized() override;
 
-	void paint(juce::Graphics& g) override;
+    void buttonClicked(juce::Button* button) override;
+    void sliderValueChanged(juce::Slider* slider) override;
 
-	/** Resized function from the Component class*/
-	void resized() override;
-
-	/** Listens for button callbacks */
-	void buttonClicked(juce::Button* button) override;
-
-	/** Listens for slider callbacks */
-	void sliderValueChanged(juce::Slider* slider) override;
+    int getNumRows() override;
+    void paintListBoxItem(int rowNumber,
+                          juce::Graphics& g,
+                          int width,
+                          int height,
+                          bool rowIsSelected) override;
+    void selectedRowsChanged(int lastRowSelected) override;
+    void listBoxItemDoubleClicked(int row, const juce::MouseEvent& event) override;
 
 private:
-	static constexpr int mainMenuEntryCount = Player::numBackgroundBanks + 2;
+    static constexpr int maxSavedPresets = 16;
 
-	enum class ViewMode
-	{
-		MainMenu,
-		AdvancedBackground,
-		AdvancedForeground
-	};
+    enum class LoadState
+    {
+        NoPlayer,
+        Preparing,
+        Loading,
+        Ready,
+        Failed
+    };
 
-	enum class LoadState
-	{
-		NoPlayer,
-		Preparing,
-		Loading,
-		Ready,
-		Failed
-	};
+    struct BankState
+    {
+        bool active = false;
+        float volume = 70.0f;
+        std::array<float, Player::maxBackgroundLayers> layerVolumes{};
+    };
 
-	using BackgroundMixLevels = std::array<std::array<float, Player::numBackgroundLayers>, Player::numBackgroundBanks>;
+    struct SoloState
+    {
+        bool active = false;
+        float volume = 62.0f;
+        float pan = 0.0f;
+    };
 
-	void timerCallback() override;
-	float cube(float input) const;
-	void configureButton(juce::TextButton& button, bool prominent = false);
-	void configureToggle(juce::ToggleButton& button);
-	void configureRotarySlider(juce::Slider& slider);
-	void configureVerticalSlider(juce::Slider& slider);
-	void updateLoadState();
-	void setAudioControlsEnabled(bool enabled);
-	void updateSelectedBackgroundBank(int bankIndex);
-	void updateSectionButtonStates();
-	void hideAdvancedControls();
-	void layoutMainMenu();
-	void layoutAdvancedBackground();
-	void layoutAdvancedForeground();
-	void updateHeaderText();
-	void handleBGsounds();
-	void handleSsounds();
-	void advancedBGsounds();
-	void advancedSSsounds();
-	void handleBackButton();
+    struct AppState
+    {
+        float masterBackground = 72.0f;
+        float masterSolo = 65.0f;
+        std::array<BankState, Player::numBackgroundBanks> banks{};
+        std::array<SoloState, Player::numForegroundSounds> solos{};
+    };
 
-	//Pointer to the player object
-	Player* player{ nullptr };
-	juce::LookAndFeel_V4 lookAndFeel;
-	juce::Label titleLabel;
-	juce::Label subtitleLabel;
-	juce::Label primarySectionLabel;
-	juce::Label secondarySectionLabel;
-	juce::Label advancedTitleLabel;
-	juce::Label advancedSubtitleLabel;
-	std::array<juce::Label, Player::numBackgroundLayers> backgroundLayerLabels;
-	juce::Label loadStatusLabel;
+    struct SavedPreset
+    {
+        juce::String id;
+        juce::String name;
+        juce::int64 updatedAt = 0;
+        AppState state;
+    };
 
-	//Declaration of Play button
-	juce::TextButton backButton { "Back" };
+    void timerCallback() override;
 
-	//Declaration of makeshift multi-choice combo-box
-	std::array <juce::TextButton, mainMenuEntryCount> mainMenuBackgroundSounds;
-	std::array <juce::TextButton, mainMenuEntryCount> mainMenuForegroundSounds;
+    float cube(float input) const;
+    float clampPercent(float value) const;
+    float clampPanPercent(float value) const;
 
-	//Advanced Settings BS components
-	std::array <juce::TextButton, Player::numBackgroundBanks> backgroundSoundsButton;
-	std::array <juce::Slider, Player::numBackgroundLayers> backgroundSoundsIndividualVolume;
-	std::array <juce::Slider, Player::numBackgroundBanks> backgroundSoundsBankVolume;
-	std::array <juce::ToggleButton, Player::numBackgroundBanks> backgroundSoundsBankToggle;
+    AppState createDefaultState() const;
+    AppState deserialiseState(const juce::var& source, const AppState& fallback) const;
+    juce::var serialiseState(const AppState& source) const;
+    juce::String summarisePreset(const SavedPreset& preset) const;
+    juce::String createPresetId() const;
+    juce::String getBackgroundBankName(int bankIndex) const;
+    juce::String getForegroundSoundName(int soundIndex) const;
+    int getBackgroundLayerCount(int bankIndex) const;
+    juce::String formatPanLabel(float pan) const;
 
-	//Advanced Settings SS components
-	std::array <juce::TextButton, Player::numForegroundSounds> foregroundSoundsButton;
-	std::array <juce::Slider, Player::numForegroundSounds> foregroundSoundsVolume;
-	std::array <juce::Slider, Player::numForegroundSounds> foregroundSoundsPan;
+    void initialiseLookAndFeel();
+    void initialiseSettings();
+    void restoreState();
+    void restorePresets();
+    void persistState();
+    void persistPresets();
 
-	//Global volume sliders
-	juce::Slider backgroundSoundsGlobalVolume;
-	juce::Slider foregroundSoundsGlobalVolume;
+    void configurePrimaryButton(juce::TextButton& button);
+    void configureSecondaryButton(juce::TextButton& button);
+    void configurePresetButton(juce::TextButton& button, const juce::String& text);
+    void configureSectionLabel(juce::Label& label, const juce::String& text, float fontHeight, juce::Colour colour);
+    void configureHorizontalSlider(juce::Slider& slider, bool bipolar = false);
 
-	BackgroundMixLevels backgroundMixLevels{};
-	ViewMode currentView{ ViewMode::MainMenu };
-	LoadState loadState{ LoadState::NoPlayer };
-	bool backgroundMenuExpanded = false;
-	bool foregroundMenuExpanded = false;
-	bool audioControlsEnabled = false;
-	int selectedBackgroundBank = 0;
-	juce::Rectangle<int> heroCardBounds;
-	juce::Rectangle<int> primaryCardBounds;
-	juce::Rectangle<int> secondaryCardBounds;
-	juce::Rectangle<int> advancedHeaderBounds;
-	juce::Rectangle<int> advancedGridBounds;
-	juce::Rectangle<int> advancedFooterBounds;
+    void updateLoadState();
+    void setAudioControlsEnabled(bool enabled);
+    void updatePlayerLabels();
+    void updatePresetButtons();
+    void updatePresetList();
+    void updateSavePresetAvailability();
+    void updateSelectedBankUi();
+    void updateBankCards();
+    void updateSoloCards();
+    void updateStatusText();
+    void setStatusMessage(const juce::String& message);
+    void commitStateChange(const juce::String& message = {});
+    void syncUiFromState();
+    void syncPlayerFromState();
+
+    void setMasterMix(float backgroundValue, float soloValue);
+    void applyMixPreset(float backgroundValue, float soloValue, const juce::String& label);
+    void saveCurrentPreset();
+    void loadSelectedPreset();
+    void deleteSelectedPreset();
+    void stopAllPlayback();
+    void resetAllSliders();
+    void resetBankSliders(int bankIndex);
+
+    Player* player{ nullptr };
+    juce::LookAndFeel_V4 lookAndFeel;
+    std::unique_ptr<juce::PropertiesFile> settingsFile;
+    AppState state;
+    std::vector<SavedPreset> savedPresets;
+    LoadState loadState{ LoadState::NoPlayer };
+    juce::String statusMessage;
+    juce::int64 statusMessageExpiryMs = 0;
+    bool audioControlsEnabled = false;
+    int selectedBackgroundBank = 0;
+    int selectedPresetRow = -1;
+
+    juce::Label titleLabel;
+    juce::Label subtitleLabel;
+    juce::Label statusLabel;
+    juce::Label masterSectionLabel;
+    juce::Label backgroundMasterLabel;
+    juce::Label foregroundMasterLabel;
+    juce::Label presetsSectionLabel;
+    juce::Label bedsSectionLabel;
+    juce::Label layersSectionLabel;
+    juce::Label selectedBankLabel;
+    juce::Label selectedBankHintLabel;
+    juce::Label solosSectionLabel;
+    juce::Label presetCountLabel;
+    juce::Label presetEmptyLabel;
+
+    juce::TextButton stopAllButton{ "Stop All" };
+    juce::TextButton resetAllSlidersButton{ "Reset All Sliders" };
+    juce::TextButton driftPresetButton{ "Drift" };
+    juce::TextButton focusPresetButton{ "Focus" };
+    juce::TextButton detailPresetButton{ "Detail" };
+    juce::TextButton savePresetButton{ "Save Current" };
+    juce::TextButton loadPresetButton{ "Load Selected" };
+    juce::TextButton deletePresetButton{ "Delete Selected" };
+    juce::TextEditor presetNameEditor;
+    juce::ListBox presetListBox;
+
+    juce::Slider backgroundMasterSlider;
+    juce::Slider foregroundMasterSlider;
+
+    std::array<juce::TextButton, Player::numBackgroundBanks> bankToggleButtons;
+    std::array<juce::TextButton, Player::numBackgroundBanks> bankSelectButtons;
+    std::array<juce::TextButton, Player::numBackgroundBanks> bankResetButtons;
+    std::array<juce::Slider, Player::numBackgroundBanks> bankVolumeSliders;
+    std::array<juce::Label, Player::numBackgroundBanks> bankSummaryLabels;
+
+    std::array<juce::Label, Player::maxBackgroundLayers> layerLabels;
+    std::array<juce::Slider, Player::maxBackgroundLayers> layerSliders;
+
+    std::array<juce::TextButton, Player::numForegroundSounds> soloToggleButtons;
+    std::array<juce::Slider, Player::numForegroundSounds> soloVolumeSliders;
+    std::array<juce::Slider, Player::numForegroundSounds> soloPanSliders;
+
+    juce::Rectangle<int> headerCardBounds;
+    juce::Rectangle<int> masterCardBounds;
+    juce::Rectangle<int> presetsCardBounds;
+    juce::Rectangle<int> bedsCardBounds;
+    juce::Rectangle<int> layersCardBounds;
+    juce::Rectangle<int> solosCardBounds;
+    std::array<juce::Rectangle<int>, Player::numBackgroundBanks> bankCardBounds{};
+    std::array<juce::Rectangle<int>, Player::numForegroundSounds> soloCardBounds{};
 };

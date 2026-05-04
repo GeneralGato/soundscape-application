@@ -1,0 +1,403 @@
+{
+  "manifestVersion": 1,
+  "project": "Soundscape Application",
+  "libraryStatus": "prototype",
+  "notes": "Current prefilled manifest from the repo state. Most assets are still proof-of-concept and many are expected to be replaced with self-recorded material later.",
+  "beds": [
+    {
+      "id": "ambient",
+      "displayName": "Ambient",
+      "status": "prototype",
+      "ownership": "mixed",
+      "replacePriority": "high",
+      "description": "Choir, piano, and synth textures.",
+      "loop": {
+        "durationSeconds": 180,
+        "sampleRateHz": 48000,
+        "qaStatus": "delivery-audited"
+      },
+      "sourceLayers": [
+        {
+          "id": "ambient-bass",
+          "displayName": "Bass",
+          "role": "anchor",
+          "origin": "mixed",
+          "status": "prototype",
+          "plannedAction": "review",
+          "notes": "Proof-of-concept layer; keep or replace after re-record plan is clearer."
+        },
+        {
+          "id": "ambient-guitar",
+          "displayName": "Guitar",
+          "role": "texture",
+          "origin": "mixed",
+          "status": "prototype",
+          "plannedAction": "review"
+        },
+        {
+          "id": "ambient-male-choir",
+          "displayName": "Male Choir",
+          "role": "pad",
+          "origin": "mixed",
+          "status": "prototype",
+          "plannedAction": "review"
+        },
+        {
+          "id": "ambient-female-choir",
+          "displayName": "Female Choir",
+          "role": "pad",
+          "origin": "mixed",
+          "status": "prototype",
+          "plannedAction": "review"
+        },
+        {
+          "id": "ambient-pluck-synth",
+          "displayName": "Pluck Synth",
+          "role": "detail",
+          "origin": "mixed",
+          "status": "prototype",
+          "plannedAction": "review"
+        },
+        {
+          "id": "ambient-piano",
+          "displayName": "Piano",
+          "role": "detail",
+          "origin": "mixed",
+          "status": "prototype",
+          "plannedAction": "review"
+        }
+      ],
+      "delivery": {
+        "runtimeProfile": "desktop-and-phone-current",
+        "stem": {
+          "path": "Soundscapes/Stems/ambient-stem.mp3",
+          "channelFormat": "stereo",
+          "defaultPlayback": true,
+          "stemGainCompensation": 6,
+          "loopDurationSeconds": 180
+        },
+        "customLayers": [
+          {
+            "id": "ambient-bass-delivery",
+            "order": 1,
+            "displayName": "Bass",
+            "path": "Soundscapes/Ambient/1. Bass.mp3",
+            "channelFormat": "not-yet-audited",
+            "panReady": false,
+            "derivedFrom": [
+              "ambient-bass"
+            ],
+            "defaultLevelPercent": 100
+          },
+          {
+            "id": "ambient-guitar-delivery",
+            "order": 2,
+            "displayName": "Guitar",
+            "path": "Soundscapes/Ambient/2. Guitar.mp3",
+            "channelFormat": "not-yet-audited",
+            "panReady": false,
+            "derivedFrom": [
+              "ambient-guitar"
+            ],
+            "defaultLevelPercent": 100
+          },
+          {
+            "id": "ambient-male-choir-delivery",
+            "order": 3,
+            "displayName": "Male Choir",
+            "path": "Soundscapes/Ambient/3. Male Choir.mp3",
+            "channelFormat": "not-yet-audited",
+            "panReady": false,
+            "derivedFrom": [
+              "ambient-male-choir"
+            ],
+            "defaultLevelPercent": 100
+          },
+          {
+            "id": "ambient-female-choir-delivery",
+            "order": 4,
+            "displayName": "Female Choir",
+            "path": "Soundscapes/Ambient/4. Female Choir.mp3",
+            "channelFormat": "not-yet-audited",
+            "panReady": false,
+            "derivedFrom": [
+              "ambient-female-choir"
+            ],
+            "defaultLevelPercent": 100
+          },
+          {
+            "id": "ambient-pluck-synth-delivery",
+            "order": 5,
+            "displayName": "Pluck Synth",
+            "path": "Soundscapes/Ambient/5. Pluck Synth.mp3",
+            "channelFormat": "not-yet-audited",
+            "panReady": false,
+            "derivedFrom": [
+              "ambient-pluck-synth"
+            ],
+            "defaultLevelPercent": 100
+          },
+          {
+            "id": "ambient-piano-delivery",
+            "order": 6,
+            "displayName": "Piano",
+            "path": "Soundscapes/Ambient/6. Piano.mp3",
+            "channelFormat": "not-yet-audited",
+            "panReady": false,
+            "derivedFrom": [
+              "ambient-piano"
+            ],
+            "defaultLevelPercent": 100
+          }
+        ],
+        "deliveryNotes": "Current proof-of-concept delivery set mirrors the existing six exported custom layers."
+      },
+      "implementationNotes": "Candidate for future merge or reduction if fewer layers produce a stronger bed."
+    },
+    {
+      "id": "storm",
+      "displayName": "Rainy Day",
+      "status": "prototype",
+      "ownership": "mixed",
+      "replacePriority": "high",
+      "description": "Rain, wind, and distant thunder.",
+      "loop": {
+        "durationSeconds": 180,
+        "sampleRateHz": 48000,
+        "qaStatus": "delivery-audited"
+      },
+      "sourceLayers": [
+        { "id": "storm-light-rain", "displayName": "Light Rain", "role": "texture", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "storm-breeze", "displayName": "Breeze", "role": "motion", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "storm-distant-thunder", "displayName": "Distant Thunder", "role": "accent", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "storm-heavy-rain", "displayName": "Heavy Rain", "role": "anchor", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "storm-cold-wind", "displayName": "Cold Wind", "role": "motion", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "storm-close-thunder", "displayName": "Close Thunder", "role": "accent", "origin": "mixed", "status": "prototype", "plannedAction": "review" }
+      ],
+      "delivery": {
+        "runtimeProfile": "desktop-and-phone-current",
+        "stem": { "path": "Soundscapes/Stems/storm-stem.mp3", "channelFormat": "stereo", "defaultPlayback": true, "stemGainCompensation": 6, "loopDurationSeconds": 180 },
+        "customLayers": [
+          { "id": "storm-light-rain-delivery", "order": 1, "displayName": "Light Rain", "path": "Soundscapes/Storm/1. Light Rain.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["storm-light-rain"], "defaultLevelPercent": 100 },
+          { "id": "storm-breeze-delivery", "order": 2, "displayName": "Breeze", "path": "Soundscapes/Storm/2. Breeze.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["storm-breeze"], "defaultLevelPercent": 100 },
+          { "id": "storm-distant-thunder-delivery", "order": 3, "displayName": "Distant Thunder", "path": "Soundscapes/Storm/3. Distant Thunder.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["storm-distant-thunder"], "defaultLevelPercent": 100 },
+          { "id": "storm-heavy-rain-delivery", "order": 4, "displayName": "Heavy Rain", "path": "Soundscapes/Storm/4. Heavy Rain.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["storm-heavy-rain"], "defaultLevelPercent": 100 },
+          { "id": "storm-cold-wind-delivery", "order": 5, "displayName": "Cold Wind", "path": "Soundscapes/Storm/5. Cold Wind.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["storm-cold-wind"], "defaultLevelPercent": 100 },
+          { "id": "storm-close-thunder-delivery", "order": 6, "displayName": "Close Thunder", "path": "Soundscapes/Storm/6. Close Thunder.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["storm-close-thunder"], "defaultLevelPercent": 100 }
+        ],
+        "deliveryNotes": "Candidate for future source cleanup and stronger self-recorded weather layers."
+      }
+    },
+    {
+      "id": "beach",
+      "displayName": "Seaside",
+      "status": "prototype",
+      "ownership": "mixed",
+      "replacePriority": "high",
+      "description": "Wind, waves, and gulls.",
+      "loop": {
+        "durationSeconds": 180,
+        "sampleRateHz": 48000,
+        "qaStatus": "delivery-audited"
+      },
+      "sourceLayers": [
+        { "id": "beach-wind", "displayName": "Wind", "role": "texture", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "beach-distant-waves", "displayName": "Distant Waves", "role": "anchor", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "beach-pebble-waves", "displayName": "Pebble Waves", "role": "detail", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "beach-gentle-waves", "displayName": "Gentle Waves", "role": "motion", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "beach-ship-creak", "displayName": "Ship Creak", "role": "accent", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "beach-seagulls", "displayName": "Seagulls", "role": "accent", "origin": "mixed", "status": "prototype", "plannedAction": "review" }
+      ],
+      "delivery": {
+        "runtimeProfile": "desktop-and-phone-current",
+        "stem": { "path": "Soundscapes/Stems/beach-stem.mp3", "channelFormat": "stereo", "defaultPlayback": true, "stemGainCompensation": 6, "loopDurationSeconds": 180 },
+        "customLayers": [
+          { "id": "beach-wind-delivery", "order": 1, "displayName": "Wind", "path": "Soundscapes/Beach/1. Wind.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["beach-wind"], "defaultLevelPercent": 100 },
+          { "id": "beach-distant-waves-delivery", "order": 2, "displayName": "Distant Waves", "path": "Soundscapes/Beach/2. Distant Waves.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["beach-distant-waves"], "defaultLevelPercent": 100 },
+          { "id": "beach-pebble-waves-delivery", "order": 3, "displayName": "Pebble Waves", "path": "Soundscapes/Beach/3. Pebble Waves.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["beach-pebble-waves"], "defaultLevelPercent": 100 },
+          { "id": "beach-gentle-waves-delivery", "order": 4, "displayName": "Gentle Waves", "path": "Soundscapes/Beach/4. Gentle Waves.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["beach-gentle-waves"], "defaultLevelPercent": 100 },
+          { "id": "beach-ship-creak-delivery", "order": 5, "displayName": "Ship Creak", "path": "Soundscapes/Beach/5. Ship Creak.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["beach-ship-creak"], "defaultLevelPercent": 100 },
+          { "id": "beach-seagulls-delivery", "order": 6, "displayName": "Seagulls", "path": "Soundscapes/Beach/6. Seagulls.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["beach-seagulls"], "defaultLevelPercent": 100 }
+        ],
+        "deliveryNotes": "Strong candidate for higher-quality self-recorded wave and wind replacements."
+      }
+    },
+    {
+      "id": "drone",
+      "displayName": "Drone",
+      "status": "prototype",
+      "ownership": "mixed",
+      "replacePriority": "medium",
+      "description": "Industrial hum and harmonic drone.",
+      "loop": {
+        "durationSeconds": 180,
+        "sampleRateHz": 48000,
+        "qaStatus": "delivery-audited"
+      },
+      "sourceLayers": [
+        { "id": "drone-synth", "displayName": "Synth", "role": "anchor", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "drone-guitar-feedback", "displayName": "Guitar Feedback", "role": "texture", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "drone-blender", "displayName": "Blender", "role": "motion", "origin": "mixed", "status": "prototype", "plannedAction": "merge" },
+        { "id": "drone-bottle", "displayName": "Bottle", "role": "accent", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "drone-oven", "displayName": "Oven", "role": "texture", "origin": "mixed", "status": "prototype", "plannedAction": "merge" },
+        { "id": "drone-white-noise", "displayName": "White Noise", "role": "texture", "origin": "mixed", "status": "prototype", "plannedAction": "review" }
+      ],
+      "delivery": {
+        "runtimeProfile": "desktop-and-phone-current",
+        "stem": { "path": "Soundscapes/Stems/drone-stem.mp3", "channelFormat": "stereo", "defaultPlayback": true, "stemGainCompensation": 6, "loopDurationSeconds": 180 },
+        "customLayers": [
+          { "id": "drone-synth-delivery", "order": 1, "displayName": "Synth", "path": "Soundscapes/Drone/6. Synth.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["drone-synth"], "defaultLevelPercent": 100 },
+          { "id": "drone-guitar-feedback-delivery", "order": 2, "displayName": "Guitar Feedback", "path": "Soundscapes/Drone/1. Guitar Feedback.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["drone-guitar-feedback"], "defaultLevelPercent": 100 },
+          { "id": "drone-blender-delivery", "order": 3, "displayName": "Blender", "path": "Soundscapes/Drone/4. Blender.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["drone-blender"], "defaultLevelPercent": 100 },
+          { "id": "drone-bottle-delivery", "order": 4, "displayName": "Bottle", "path": "Soundscapes/Drone/5. Bottle.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["drone-bottle"], "defaultLevelPercent": 100 },
+          { "id": "drone-oven-delivery", "order": 5, "displayName": "Oven", "path": "Soundscapes/Drone/2. Oven.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["drone-oven"], "defaultLevelPercent": 100 },
+          { "id": "drone-white-noise-delivery", "order": 6, "displayName": "White Noise", "path": "Soundscapes/Drone/3. White Noise.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["drone-white-noise"], "defaultLevelPercent": 100 }
+        ],
+        "deliveryNotes": "Current layer ordering mirrors the existing app order rather than numeric filename order."
+      }
+    },
+    {
+      "id": "forest",
+      "displayName": "Forest",
+      "status": "prototype",
+      "ownership": "mixed",
+      "replacePriority": "high",
+      "description": "Leaves, birdsong, and bees.",
+      "loop": {
+        "durationSeconds": 180,
+        "sampleRateHz": 48000,
+        "qaStatus": "delivery-audited"
+      },
+      "sourceLayers": [
+        { "id": "forest-leaves-1", "displayName": "Leaves A", "role": "texture", "origin": "mixed", "status": "prototype", "plannedAction": "merge" },
+        { "id": "forest-leaves-2", "displayName": "Leaves B", "role": "texture", "origin": "mixed", "status": "prototype", "plannedAction": "merge" },
+        { "id": "forest-birdsong-1", "displayName": "Birdsong A", "role": "detail", "origin": "mixed", "status": "prototype", "plannedAction": "merge" },
+        { "id": "forest-birdsong-2", "displayName": "Birdsong B", "role": "detail", "origin": "mixed", "status": "prototype", "plannedAction": "merge" },
+        { "id": "forest-birdsong-3", "displayName": "Birdsong C", "role": "detail", "origin": "mixed", "status": "prototype", "plannedAction": "merge" },
+        { "id": "forest-bees", "displayName": "Bees", "role": "motion", "origin": "mixed", "status": "prototype", "plannedAction": "review" }
+      ],
+      "delivery": {
+        "runtimeProfile": "desktop-and-phone-current",
+        "stem": { "path": "Soundscapes/Stems/forest-stem.mp3", "channelFormat": "stereo", "defaultPlayback": true, "stemGainCompensation": 6, "loopDurationSeconds": 180 },
+        "customLayers": [
+          { "id": "forest-leaves-1-delivery", "order": 1, "displayName": "Leaves", "path": "Soundscapes/Forest/1. Leaves.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["forest-leaves-1"], "defaultLevelPercent": 100 },
+          { "id": "forest-leaves-2-delivery", "order": 2, "displayName": "Leaves", "path": "Soundscapes/Forest/2. Leaves.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["forest-leaves-2"], "defaultLevelPercent": 100 },
+          { "id": "forest-birdsong-1-delivery", "order": 3, "displayName": "Birdsong", "path": "Soundscapes/Forest/3. Birdsong.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["forest-birdsong-1"], "defaultLevelPercent": 100 },
+          { "id": "forest-birdsong-2-delivery", "order": 4, "displayName": "Birdsong", "path": "Soundscapes/Forest/4. Birdsong.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["forest-birdsong-2"], "defaultLevelPercent": 100 },
+          { "id": "forest-birdsong-3-delivery", "order": 5, "displayName": "Birdsong", "path": "Soundscapes/Forest/5. Birdsong.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["forest-birdsong-3"], "defaultLevelPercent": 100 },
+          { "id": "forest-bees-delivery", "order": 6, "displayName": "Bees", "path": "Soundscapes/Forest/6. Bees.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["forest-bees"], "defaultLevelPercent": 100 }
+        ],
+        "deliveryNotes": "One of the clearest candidates for collapsing duplicate layers into fewer stronger exports later."
+      }
+    },
+    {
+      "id": "field",
+      "displayName": "Summer Field",
+      "status": "prototype",
+      "ownership": "mixed",
+      "replacePriority": "high",
+      "description": "Grass, cicadas, and evening insects.",
+      "loop": {
+        "durationSeconds": 180,
+        "sampleRateHz": 48000,
+        "qaStatus": "delivery-audited"
+      },
+      "sourceLayers": [
+        { "id": "field-grass-rustle", "displayName": "Grass Rustle", "role": "texture", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "field-summer-wind", "displayName": "Summer Wind", "role": "motion", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "field-crickets-1", "displayName": "Crickets 1", "role": "detail", "origin": "mixed", "status": "prototype", "plannedAction": "merge" },
+        { "id": "field-crickets-2", "displayName": "Crickets 2", "role": "detail", "origin": "mixed", "status": "prototype", "plannedAction": "merge" },
+        { "id": "field-cicadas", "displayName": "Cicadas", "role": "anchor", "origin": "mixed", "status": "prototype", "plannedAction": "review" },
+        { "id": "field-owl", "displayName": "Owl", "role": "accent", "origin": "mixed", "status": "prototype", "plannedAction": "review" }
+      ],
+      "delivery": {
+        "runtimeProfile": "desktop-and-phone-current",
+        "stem": { "path": "Soundscapes/Stems/field-stem.mp3", "channelFormat": "stereo", "defaultPlayback": true, "stemGainCompensation": 6, "loopDurationSeconds": 180 },
+        "customLayers": [
+          { "id": "field-grass-rustle-delivery", "order": 1, "displayName": "Grass Rustle", "path": "Soundscapes/Field/1. Grass Rustle.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["field-grass-rustle"], "defaultLevelPercent": 100 },
+          { "id": "field-summer-wind-delivery", "order": 2, "displayName": "Summer Wind", "path": "Soundscapes/Field/2. Summer Wind.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["field-summer-wind"], "defaultLevelPercent": 100 },
+          { "id": "field-crickets-1-delivery", "order": 3, "displayName": "Crickets 1", "path": "Soundscapes/Field/3. Crickets 1.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["field-crickets-1"], "defaultLevelPercent": 100 },
+          { "id": "field-crickets-2-delivery", "order": 4, "displayName": "Crickets 2", "path": "Soundscapes/Field/4. Crickets 2.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["field-crickets-2"], "defaultLevelPercent": 100 },
+          { "id": "field-cicadas-delivery", "order": 5, "displayName": "Cicadas", "path": "Soundscapes/Field/5. Cicadas.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["field-cicadas"], "defaultLevelPercent": 100 },
+          { "id": "field-owl-delivery", "order": 6, "displayName": "Owl", "path": "Soundscapes/Field/6. Owl.mp3", "channelFormat": "not-yet-audited", "panReady": false, "derivedFrom": ["field-owl"], "defaultLevelPercent": 100 }
+        ],
+        "deliveryNotes": "Good candidate for stronger own field recordings once the next recording pass is done."
+      }
+    }
+  ],
+  "soloLoops": [
+    {
+      "id": "light-stream",
+      "displayName": "Light Stream",
+      "status": "prototype",
+      "origin": "mixed",
+      "replacePriority": "medium",
+      "description": "Bright water texture.",
+      "deliveryPath": "1. Light Stream.mp3",
+      "sampleRateHz": 48000,
+      "channelFormat": "not-yet-audited",
+      "panMode": "free",
+      "notes": "Current app allows free pan for solo loops."
+    },
+    {
+      "id": "river",
+      "displayName": "River",
+      "status": "prototype",
+      "origin": "mixed",
+      "replacePriority": "medium",
+      "description": "A broader steady flow.",
+      "deliveryPath": "2. Stream.mp3",
+      "sampleRateHz": 48000,
+      "channelFormat": "not-yet-audited",
+      "panMode": "free"
+    },
+    {
+      "id": "waterfall",
+      "displayName": "Waterfall",
+      "status": "prototype",
+      "origin": "mixed",
+      "replacePriority": "medium",
+      "description": "Dense rushing water.",
+      "deliveryPath": "3. Waterfall.mp3",
+      "sampleRateHz": 48000,
+      "channelFormat": "not-yet-audited",
+      "panMode": "free"
+    },
+    {
+      "id": "campfire",
+      "displayName": "Campfire",
+      "status": "prototype",
+      "origin": "mixed",
+      "replacePriority": "medium",
+      "description": "Low crackle and warmth.",
+      "deliveryPath": "4. Campfire.mp3",
+      "sampleRateHz": 48000,
+      "channelFormat": "not-yet-audited",
+      "panMode": "free"
+    },
+    {
+      "id": "cat-purr",
+      "displayName": "Cat Purr",
+      "status": "prototype",
+      "origin": "mixed",
+      "replacePriority": "low",
+      "description": "Soft, close comfort.",
+      "deliveryPath": "5. Cat Purr.mp3",
+      "sampleRateHz": 48000,
+      "channelFormat": "not-yet-audited",
+      "panMode": "free"
+    },
+    {
+      "id": "crows",
+      "displayName": "Crows",
+      "status": "prototype",
+      "origin": "mixed",
+      "replacePriority": "medium",
+      "description": "Sparse outdoor movement.",
+      "deliveryPath": "6. Crows.mp3",
+      "sampleRateHz": 48000,
+      "channelFormat": "not-yet-audited",
+      "panMode": "free"
+    }
+  ]
+}

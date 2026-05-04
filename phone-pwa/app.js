@@ -3,6 +3,7 @@ const isAndroidWrapper = query.get("wrapper") === "android";
 const storageKey = "soundscape-pocket-state-v1";
 const presetStorageKey = "soundscape-pocket-presets-v1";
 const resourceBase = isAndroidWrapper ? "./Resources" : "../Resources";
+const manifestPath = `${resourceBase}/asset-manifest.current.json`;
 const backgroundLayerBaseGain = 0.11;
 const soloBaseGain = 0.68;
 const defaultBackgroundLayerVolume = 100;
@@ -16,7 +17,7 @@ const layerMixDeadband = 1.0;
 
 let mixPriorityCounter = 1;
 
-const bankDefinitions = [
+const fallbackBankDefinitions = [
     {
         id: "ambient",
         title: "Ambient",
@@ -115,7 +116,7 @@ const bankDefinitions = [
     }
 ];
 
-const soloDefinitions = [
+const fallbackSoloDefinitions = [
     { id: "light-stream", title: "Light Stream", path: "1. Light Stream.mp3", note: "Bright water texture." },
     { id: "river", title: "River", path: "2. Stream.mp3", note: "A broader steady flow." },
     { id: "waterfall", title: "Waterfall", path: "3. Waterfall.mp3", note: "Dense rushing water." },
@@ -123,6 +124,9 @@ const soloDefinitions = [
     { id: "cat-purr", title: "Cat Purr", path: "5. Cat Purr.mp3", note: "Soft, close comfort." },
     { id: "crows", title: "Crows", path: "6. Crows.mp3", note: "Sparse outdoor movement." }
 ];
+
+let bankDefinitions = [];
+let soloDefinitions = [];
 
 const dom = {
     wakeButtons: Array.from(document.querySelectorAll("[data-role='wake-audio']")),
@@ -148,8 +152,8 @@ const dom = {
     soloSection: document.querySelector("#solo-section")
 };
 
-let state = loadState();
-let savedPresets = loadSavedPresets();
+let state = null;
+let savedPresets = [];
 let audioContext = null;
 let backgroundBus = null;
 let soloBus = null;
@@ -157,16 +161,27 @@ let compressor = null;
 let masterBus = null;
 
 const trackEngines = new Map();
-const bankPlaybackStates = bankDefinitions.map(() => ({
-    activeMode: "none",
-    timelineSeconds: 0,
-    timelineContextTime: 0
-}));
+const bankPlaybackStates = [];
 
-initialize();
+initialize().catch((error) => {
+    console.error(error);
+    dom.statusText.textContent = "Sound library failed to load.";
+});
 
-function initialize() {
+async function initialize() {
     document.body.classList.toggle("wrapper-mode", isAndroidWrapper);
+
+    const definitions = await loadLibraryDefinitions();
+    bankDefinitions = definitions.beds;
+    soloDefinitions = definitions.solos;
+    bankPlaybackStates.splice(0, bankPlaybackStates.length, ...bankDefinitions.map(() => ({
+        activeMode: "none",
+        timelineSeconds: 0,
+        timelineContextTime: 0
+    })));
+
+    state = loadState();
+    savedPresets = loadSavedPresets();
 
     dom.masterBackground.value = String(state.masterBackground);
     dom.masterSolo.value = String(state.masterSolo);
@@ -235,6 +250,75 @@ function initialize() {
     syncWakeButtonState();
     updatePresetStates();
     updateSavePresetAvailability();
+}
+
+async function loadLibraryDefinitions() {
+    try {
+        const response = await fetch(manifestPath, { cache: "no-store" });
+        if (!response.ok) {
+            throw new Error(`Manifest request failed: ${response.status}`);
+        }
+
+        const manifest = await response.json();
+        const beds = Array.isArray(manifest?.beds)
+            ? manifest.beds.map(mapManifestBedToBankDefinition).filter((bank) => bank.tracks.length > 0)
+            : [];
+        const solos = Array.isArray(manifest?.soloLoops)
+            ? manifest.soloLoops.map(mapManifestSoloToDefinition).filter((solo) => Boolean(solo.path))
+            : [];
+
+        if (beds.length === 0 || solos.length === 0) {
+            throw new Error("Manifest did not contain usable bed and solo definitions.");
+        }
+
+        return { beds, solos };
+    } catch (error) {
+        console.warn("Using fallback library definitions.", error);
+        return {
+            beds: fallbackBankDefinitions.map((bank) => ({
+                ...bank,
+                trackLabels: bank.tracks.map((path) => getTrackLabel(path))
+            })),
+            solos: [...fallbackSoloDefinitions]
+        };
+    }
+}
+
+function mapManifestBedToBankDefinition(bed) {
+    const customLayers = Array.isArray(bed?.delivery?.customLayers) ? bed.delivery.customLayers : [];
+    return {
+        id: typeof bed?.id === "string" && bed.id ? bed.id : `bed-${Math.random().toString(36).slice(2, 8)}`,
+        title: typeof bed?.displayName === "string" && bed.displayName ? bed.displayName : "Untitled Bed",
+        note: typeof bed?.description === "string" ? bed.description : "",
+        stemPath: typeof bed?.delivery?.stem?.path === "string" ? bed.delivery.stem.path : "",
+        stemGainCompensation: typeof bed?.delivery?.stem?.stemGainCompensation === "number"
+            ? bed.delivery.stem.stemGainCompensation
+            : customLayers.length,
+        stemDurationSeconds: typeof bed?.delivery?.stem?.loopDurationSeconds === "number"
+            ? bed.delivery.stem.loopDurationSeconds
+            : bankStemLoopSeconds,
+        tracks: customLayers
+            .map((layer) => layer?.path)
+            .filter((path) => typeof path === "string" && path),
+        trackLabels: customLayers.map((layer) => {
+            if (typeof layer?.displayName === "string" && layer.displayName) {
+                return layer.displayName;
+            }
+
+            return getTrackLabel(layer?.path || "Layer");
+        })
+    };
+}
+
+function mapManifestSoloToDefinition(solo) {
+    return {
+        id: typeof solo?.id === "string" && solo.id ? solo.id : `solo-${Math.random().toString(36).slice(2, 8)}`,
+        title: typeof solo?.displayName === "string" && solo.displayName ? solo.displayName : "Untitled Solo",
+        path: typeof solo?.deliveryPath === "string" ? solo.deliveryPath : "",
+        note: typeof solo?.description === "string"
+            ? solo.description
+            : (typeof solo?.notes === "string" ? solo.notes : "")
+    };
 }
 
 function setMasterMix(backgroundValue, soloValue) {
@@ -753,6 +837,7 @@ function renderBankCards() {
     dom.bankGrid.innerHTML = "";
 
     bankDefinitions.forEach((bank, index) => {
+        const layerCountLabel = `${bank.tracks.length} looping layer${bank.tracks.length === 1 ? "" : "s"}`;
         const article = document.createElement("article");
         article.className = "sound-card";
         article.dataset.role = "bank-card";
@@ -769,7 +854,7 @@ function renderBankCards() {
                 <strong data-role="bank-volume-readout" data-index="${index}">70%</strong>
             </div>
             <div class="micro-row">
-                <span class="micro-copy" data-role="bank-layer-summary" data-index="${index}">6 looping layers</span>
+                <span class="micro-copy" data-role="bank-layer-summary" data-index="${index}">${layerCountLabel}</span>
                 <div class="micro-actions">
                     <button class="status-chip reset-chip" type="button" data-role="bank-reset" data-index="${index}">Reset bed</button>
                     <button class="status-chip blend-toggle" type="button" data-role="bank-blend-toggle" data-index="${index}" aria-expanded="false">Blend layers</button>
@@ -779,7 +864,7 @@ function renderBankCards() {
                 ${bank.tracks.map((path, layerIndex) => `
                     <label class="layer-row">
                         <div class="layer-row-head">
-                            <span class="layer-name">${getTrackLabel(path)}</span>
+                            <span class="layer-name">${bank.trackLabels?.[layerIndex] || getTrackLabel(path)}</span>
                             <strong class="layer-readout" data-role="bank-layer-readout" data-index="${index}" data-layer-index="${layerIndex}">100%</strong>
                         </div>
                         <input type="range" min="0" max="100" step="1" data-role="bank-layer-volume" data-index="${index}" data-layer-index="${layerIndex}">

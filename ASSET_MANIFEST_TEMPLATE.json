@@ -1,0 +1,87 @@
+{
+  "manifestVersion": 1,
+  "project": "Soundscape Application",
+  "libraryStatus": "working",
+  "notes": "Library truth, not runtime truth. Current delivery files may temporarily merge, replace, or omit source layers.",
+  "beds": [
+    {
+      "id": "bed-id",
+      "displayName": "Bed Name",
+      "status": "prototype",
+      "ownership": "own|mixed|downloaded-temp|licensed",
+      "replacePriority": "low|medium|high",
+      "description": "Short description of the bed.",
+      "sourceSession": "Reason project or field session name",
+      "archiveMasterPath": "Archive/Bed Name/bed-master-48k.wav",
+      "loop": {
+        "durationSeconds": 180,
+        "durationSamplesAt48k": 8640000,
+        "sampleRateHz": 48000,
+        "seamNotes": "Keep distinctive events away from the seam.",
+        "qaStatus": "needs-review"
+      },
+      "sourceLayers": [
+        {
+          "id": "source-layer-id",
+          "displayName": "Source Layer Name",
+          "role": "texture|detail|motion|anchor|accent",
+          "origin": "own|mixed|downloaded-temp|licensed",
+          "status": "keep|temporary|retired",
+          "plannedAction": "keep|replace|merge|remove|split",
+          "notes": "Optional notes about cleanup, replacement, or merge intent."
+        }
+      ],
+      "delivery": {
+        "runtimeProfile": "current-runtime",
+        "stem": {
+          "path": "Soundscapes/Stems/bed-stem.mp3",
+          "channelFormat": "stereo",
+          "defaultPlayback": true,
+          "stemGainCompensation": 6,
+          "loopDurationSeconds": 180,
+          "peakTarget": "-3 dBTP max"
+        },
+        "customLayers": [
+          {
+            "id": "delivery-layer-id",
+            "order": 1,
+            "displayName": "Delivery Layer Name",
+            "path": "Soundscapes/Bed Name/1. Delivery Layer Name.mp3",
+            "channelFormat": "mono|stereo|not-yet-audited",
+            "panReady": false,
+            "derivedFrom": [
+              "source-layer-id"
+            ],
+            "defaultLevelPercent": 100,
+            "notes": "Optional delivery note."
+          }
+        ],
+        "deliveryNotes": "Describe any source-to-delivery merges, removals, or runtime-only compromises."
+      },
+      "futureIdeas": [
+        "Optional future iteration note."
+      ],
+      "implementationNotes": "Only delivery files are required by the current runtime. Source layers remain the long-term library plan."
+    }
+  ],
+  "soloLoops": [
+    {
+      "id": "solo-id",
+      "displayName": "Solo Name",
+      "status": "prototype",
+      "origin": "own|mixed|downloaded-temp|licensed",
+      "replacePriority": "low|medium|high",
+      "description": "Short description of the solo loop.",
+      "archiveMasterPath": "Archive/Solos/solo-master-48k.wav",
+      "deliveryPath": "Solo Name.mp3",
+      "sampleRateHz": 48000,
+      "channelFormat": "mono|stereo|not-yet-audited",
+      "panMode": "free|fixed-image",
+      "loopDurationSeconds": 60,
+      "loopDurationSamplesAt48k": 2880000,
+      "seamNotes": "Optional loop-boundary note.",
+      "cleanupNotes": "Optional RX or editing note.",
+      "notes": "Optional implementation or intent note."
+    }
+  ]
+}

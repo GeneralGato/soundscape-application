@@ -6,6 +6,8 @@
 - `android-wrapper` contains the Android WebView shell.
 - `phone-pwa` contains the mobile-first static UI.
 - `Resources` contains the live app audio assets.
+- `Resources\asset-manifest.current.json` is the current machine-readable asset manifest used by the phone UI and the desktop player.
+- `ASSET_MANIFEST_TEMPLATE.md` and `ASSET_MANIFEST_TEMPLATE.json` document the long-term asset handoff format.
 - `Resources_backup_44k1_2026-05-02` is a local-only backup of older 44.1 kHz files and is intentionally gitignored.
 - `SOUND_LIBRARY_RULEBOOK.txt` contains production guidance for future audio asset work.
 
@@ -14,19 +16,19 @@
 Configure from the repo root:
 
 ```powershell
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S . -B build\vs2022 -G "Visual Studio 17 2022" -A x64
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -S . -B build\vs2022-x64 -G "Visual Studio 17 2022" -A x64
 ```
 
 Build a release executable:
 
 ```powershell
-"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build\vs2022 --config Release --target SoundscapeApplication
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" --build build\vs2022-x64 --config Release --target SoundscapeApplication
 ```
 
 The release app binary is:
 
 ```text
-build\vs2022\SoundscapeApplication_artefacts\Release\Soundscape Application.exe
+build\vs2022-x64\SoundscapeApplication_artefacts\Release\Soundscape Application.exe
 ```
 
 The build copies `Resources` next to the executable so the artefacts folder can be launched directly.
@@ -81,6 +83,7 @@ If no device or emulator is available, the Android version cannot be run directl
 - The wrapper sync task copies `phone-pwa` plus `Resources` into the generated asset directory before Android asset merge steps.
 - The wrapper relies on local asset packaging rather than network fetches.
 - Release signing is optional for local debug work but required for release builds.
+- The phone runtime now loads its bed and solo definitions from `Resources\asset-manifest.current.json` at startup, with the older hardcoded definitions kept only as a fallback.
 
 ## Non-Obvious Phone Runtime Rules
 
@@ -88,8 +91,20 @@ If no device or emulator is available, the Android version cannot be run directl
 - One stem bed costs 1 unit.
 - One custom-layer bed costs 6 units total.
 - One solo loop costs 1 unit.
+- The phone runtime no longer assumes six layers per bed; the custom-layer cost is derived from the current manifest entry for that bed.
 - If a bed has custom layer settings saved but the stream budget is full, it can continue playing as a stem while preserving the custom settings.
 - This is the behavior previously surfaced as the saved-custom stem fallback.
+
+## Desktop Runtime Notes
+
+- The desktop player now reads bed layer paths and names from `Resources\asset-manifest.current.json`.
+- The desktop mixer no longer assumes exactly six layers per bed.
+- The current desktop UI supports up to 12 visible layers for a bed.
+- The desktop bank and solo counts still match the current six-bed and six-solo library layout.
+- The desktop app now opens in a resizable dashboard window instead of forced fullscreen.
+- The desktop UI now includes Pocket-style named preset save/load/delete.
+- The desktop UI now includes per-bed reset, global slider reset, and stop-all actions.
+- Desktop bed and loop toggles now fade over 1 second instead of hard-cutting.
 
 ## Audio Asset Notes
 
