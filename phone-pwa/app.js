@@ -149,6 +149,9 @@ const dom = {
     layerPanelTitle: document.querySelector("#layer-panel-title"),
     layerPanelStatus: document.querySelector("#layer-panel-status"),
     layerPanelCopy: document.querySelector("#layer-panel-copy"),
+    layerPanelVolume: document.querySelector("#layer-panel-volume"),
+    layerPanelVolumeReadout: document.querySelector("#layer-panel-volume-readout"),
+    layerPanelReset: document.querySelector("#layer-panel-reset"),
     layerPanelMixer: document.querySelector("#layer-panel-mixer"),
     soloPanel: document.querySelector("#solo-panel"),
     soloPanelTitle: document.querySelector("#solo-panel-title"),
@@ -178,7 +181,7 @@ let compressor = null;
 let masterBus = null;
 let selectedBankIndex = 0;
 let selectedSoloIndex = 0;
-const carouselSwipeThreshold = 44;
+const carouselSwipeThreshold = 28;
 
 const trackEngines = new Map();
 const bankPlaybackStates = [];
@@ -282,6 +285,25 @@ async function initialize() {
 
     dom.bankNext?.addEventListener("click", () => {
         setSelectedBank(selectedBankIndex + 1, { scrollCard: true });
+    });
+
+    dom.layerPanelVolume?.addEventListener("input", () => {
+        if (selectedBankIndex < 0) {
+            return;
+        }
+
+        state.banks[selectedBankIndex].volume = Number(dom.layerPanelVolume.value);
+        persistState();
+        updateAllGains();
+        refreshCardStates();
+    });
+
+    dom.layerPanelReset?.addEventListener("click", () => {
+        if (selectedBankIndex < 0) {
+            return;
+        }
+
+        resetBankSliders(selectedBankIndex);
     });
 
     dom.soloPrev?.addEventListener("click", () => {
@@ -916,7 +938,11 @@ function attachCarouselGestures(track, onPrev, onNext) {
         pointerState.pointerId = event.pointerId;
         pointerState.startX = event.clientX;
         pointerState.startY = event.clientY;
-        track.setPointerCapture?.(event.pointerId);
+        try {
+            track.setPointerCapture?.(event.pointerId);
+        } catch (error) {
+            void error;
+        }
     });
 
     track.addEventListener("pointerup", (event) => {
@@ -926,7 +952,11 @@ function attachCarouselGestures(track, onPrev, onNext) {
 
         const deltaX = event.clientX - pointerState.startX;
         const deltaY = event.clientY - pointerState.startY;
-        track.releasePointerCapture?.(event.pointerId);
+        try {
+            track.releasePointerCapture?.(event.pointerId);
+        } catch (error) {
+            void error;
+        }
         resetPointerState();
 
         if (Math.abs(deltaX) < carouselSwipeThreshold || Math.abs(deltaX) <= Math.abs(deltaY)) {
@@ -988,6 +1018,8 @@ function renderSelectedBankPanel(playbackPlan = computePlaybackPlan()) {
     dom.layerPanelStatus.textContent = bankState.active ? "Live" : "Standby";
     dom.layerPanelStatus.classList.toggle("is-live", bankState.active);
     dom.layerPanelCopy.textContent = `${bank.note} ${layerCountLabel}. ${getBankSummaryLabel(bankState, resolvedMode)}.`;
+    dom.layerPanelVolume.value = String(bankState.volume);
+    dom.layerPanelVolumeReadout.textContent = `${bankState.volume}%`;
     dom.layerPanelMixer.innerHTML = bank.tracks.map((path, layerIndex) => `
         <label class="layer-row">
             <div class="layer-row-head">
@@ -1073,7 +1105,6 @@ function renderBankCards() {
     ensureValidSelections();
 
     bankDefinitions.forEach((bank, index) => {
-        const layerCountLabel = `${bank.tracks.length} looping layer${bank.tracks.length === 1 ? "" : "s"}`;
         const article = document.createElement("article");
         article.className = "sound-card carousel-card";
         article.dataset.role = "bank-card";
@@ -1083,18 +1114,6 @@ function renderBankCards() {
             <div class="sound-card-header">
                 <button class="pill-button sound-toggle" type="button" data-role="bank-toggle" data-index="${index}" data-state-label="Standby">${bank.title}</button>
                 <p class="card-note">${bank.note}</p>
-            </div>
-            <div class="slider-stack">
-                <span>Scene level</span>
-                <input type="range" min="0" max="100" step="1" data-role="bank-volume" data-index="${index}">
-                <strong data-role="bank-volume-readout" data-index="${index}">70%</strong>
-            </div>
-            <div class="micro-row">
-                <span class="micro-copy" data-role="bank-layer-summary" data-index="${index}">${layerCountLabel}</span>
-                <div class="micro-actions">
-                    <button class="status-chip reset-chip" type="button" data-role="bank-reset" data-index="${index}">Reset bed</button>
-                    <button class="status-chip blend-toggle" type="button" data-role="bank-blend-toggle" data-index="${index}" aria-controls="layer-panel">Blend layers</button>
-                </div>
             </div>
         `;
 
@@ -1134,31 +1153,6 @@ function renderBankCards() {
         });
     });
 
-    dom.bankGrid.querySelectorAll("[data-role='bank-volume']").forEach((slider) => {
-        slider.addEventListener("input", () => {
-            const index = Number(slider.dataset.index);
-            setSelectedBank(index, { scrollCard: true });
-            state.banks[index].volume = Number(slider.value);
-            persistState();
-            updateAllGains();
-            refreshCardStates();
-        });
-    });
-
-    dom.bankGrid.querySelectorAll("[data-role='bank-reset']").forEach((button) => {
-        button.addEventListener("click", () => {
-            const index = Number(button.dataset.index);
-            setSelectedBank(index, { scrollCard: true });
-            resetBankSliders(index);
-        });
-    });
-
-    dom.bankGrid.querySelectorAll("[data-role='bank-blend-toggle']").forEach((button) => {
-        button.addEventListener("click", () => {
-            setSelectedBank(Number(button.dataset.index), { scrollCard: true, scrollPanel: true });
-        });
-    });
-
     refreshCardStates();
 }
 
@@ -1176,10 +1170,6 @@ function renderSoloCards() {
             <div class="sound-card-header">
                 <button class="pill-button sound-toggle" type="button" data-role="solo-toggle" data-index="${index}" data-state-label="Standby">${solo.title}</button>
                 <p class="card-note">${solo.note}</p>
-            </div>
-            <div class="micro-row">
-                <span class="micro-copy" data-role="solo-summary" data-index="${index}">Level 62% | Center</span>
-                <button class="status-chip select-chip" type="button" data-role="solo-focus" data-index="${index}">Shape loop</button>
             </div>
         `;
 
@@ -1219,12 +1209,6 @@ function renderSoloCards() {
         });
     });
 
-    dom.soloGrid.querySelectorAll("[data-role='solo-focus']").forEach((button) => {
-        button.addEventListener("click", () => {
-            setSelectedSolo(Number(button.dataset.index), { scrollCard: true, scrollPanel: true });
-        });
-    });
-
     refreshCardStates();
 }
 
@@ -1240,11 +1224,6 @@ function refreshCardStates() {
         const index = Number(card.dataset.index);
         const config = state.banks[index];
         const toggle = card.querySelector("[data-role='bank-toggle']");
-        const slider = card.querySelector("[data-role='bank-volume']");
-        const readout = card.querySelector("[data-role='bank-volume-readout']");
-        const summary = card.querySelector("[data-role='bank-layer-summary']");
-        const blendButton = card.querySelector("[data-role='bank-blend-toggle']");
-        const resolvedMode = playbackPlan.bankModes[index];
         const selected = index === selectedBankIndex;
         const previous = !selected && index === previousBankIndex;
         const next = !selected && index === nextBankIndex;
@@ -1255,12 +1234,6 @@ function refreshCardStates() {
         card.classList.toggle("is-next", next);
         toggle.classList.toggle("is-active", config.active);
         toggle.dataset.stateLabel = config.active ? "Live" : "Standby";
-        slider.value = String(config.volume);
-        readout.textContent = `${config.volume}%`;
-        summary.textContent = getBankSummaryLabel(config, resolvedMode);
-        blendButton.textContent = selected ? "Blend open" : "Blend layers";
-        blendButton.classList.toggle("is-selected", selected);
-        blendButton.setAttribute("aria-pressed", String(selected));
     });
 
     renderSelectedBankPanel(playbackPlan);
@@ -1269,8 +1242,6 @@ function refreshCardStates() {
         const index = Number(card.dataset.index);
         const config = state.solos[index];
         const toggle = card.querySelector("[data-role='solo-toggle']");
-        const summary = card.querySelector("[data-role='solo-summary']");
-        const focusButton = card.querySelector("[data-role='solo-focus']");
         const selected = index === selectedSoloIndex;
         const previous = !selected && index === previousSoloIndex;
         const next = !selected && index === nextSoloIndex;
@@ -1281,10 +1252,6 @@ function refreshCardStates() {
         card.classList.toggle("is-next", next);
         toggle.classList.toggle("is-active", config.active);
         toggle.dataset.stateLabel = config.active ? "Live" : "Standby";
-        summary.textContent = `Level ${config.volume}% | ${formatPan(config.pan)}`;
-        focusButton.textContent = selected ? "Focus open" : "Shape loop";
-        focusButton.classList.toggle("is-selected", selected);
-        focusButton.setAttribute("aria-pressed", String(selected));
     });
 
     renderSelectedSoloPanel();

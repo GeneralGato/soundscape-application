@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#050611">
     <title>Soundscape Pocket</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="stylesheet" href="app.css?v=20260505c">
+    <link rel="stylesheet" href="app.css?v=20260505e">
 </head>
 <body>
     <div class="ambient-glow ambient-glow-one"></div>
@@ -100,6 +100,14 @@
                     <span id="layer-panel-status" class="status-chip">Standby</span>
                 </div>
                 <p id="layer-panel-copy" class="card-note">Choose a bed to adjust its layer blend in one shared window.</p>
+                <div class="detail-bank-controls">
+                    <label class="control-label detail-volume-control" for="layer-panel-volume">
+                        <span>Scene level</span>
+                        <input id="layer-panel-volume" type="range" min="0" max="100" step="1">
+                        <strong id="layer-panel-volume-readout">70%</strong>
+                    </label>
+                    <button id="layer-panel-reset" class="status-chip reset-chip" type="button">Reset bed</button>
+                </div>
                 <div id="layer-panel-mixer" class="layer-mixer detail-layer-mixer"></div>
             </section>
         </section>
@@ -149,6 +157,6 @@
         <button class="dock-button" type="button" id="jump-solos">Loops</button>
     </nav>
 
-    <script src="app.js?v=20260505c"></script>
+    <script src="app.js?v=20260505d"></script>
 </body>
 </html>
