@@ -4,11 +4,11 @@
 
 namespace
 {
-constexpr int outerPadding = 18;
-constexpr int cardGap = 12;
+constexpr int outerPadding = 22;
+constexpr int cardGap = 14;
 constexpr int cardCornerSize = 22;
-constexpr int bankCardHeight = 104;
-constexpr int soloRowHeight = 56;
+constexpr int soloRowHeight = 64;
+constexpr int activeStripeWidth = 6;
 constexpr int transientStatusLifetimeMs = 3500;
 
 constexpr float driftBackground = 82.0f;
@@ -38,20 +38,24 @@ constexpr std::array<const char*, Player::numForegroundSounds> fallbackForegroun
     "Crows"
 };
 
-const auto backgroundTop = juce::Colour::fromRGB(0xF4, 0xEA, 0xDA);
-const auto backgroundBottom = juce::Colour::fromRGB(0xD7, 0xE0, 0xDE);
-const auto cardFill = juce::Colour::fromRGBA(0xFF, 0xFF, 0xFF, 0xD8);
-const auto cardStroke = juce::Colour::fromRGBA(0x66, 0x53, 0x43, 0x30);
-const auto cardHighlight = juce::Colour::fromRGBA(0xE5, 0xA4, 0x6B, 0x55);
-const auto cardHighlightStroke = juce::Colour::fromRGB(0xC8, 0x64, 0x34);
-const auto titleColour = juce::Colour::fromRGB(0x23, 0x1B, 0x16);
-const auto bodyColour = juce::Colour::fromRGB(0x5E, 0x4D, 0x43);
-const auto accentColour = juce::Colour::fromRGB(0xC8, 0x64, 0x34);
-const auto accentSoft = juce::Colour::fromRGB(0xE5, 0xA4, 0x6B);
-const auto knobColour = juce::Colour::fromRGB(0x2C, 0x5E, 0x63);
-const auto knobTrackColour = juce::Colour::fromRGB(0xA7, 0xC4, 0xC7);
-const auto sliderTrackColour = juce::Colour::fromRGBA(0x2C, 0x5E, 0x63, 0x66);
-const auto successColour = juce::Colour::fromRGB(0x3A, 0x7D, 0x58);
+const auto backgroundTop = juce::Colour::fromRGB(0x02, 0x03, 0x0A);
+const auto backgroundBlue = juce::Colour::fromRGB(0x07, 0x13, 0x31);
+const auto backgroundPurple = juce::Colour::fromRGB(0x24, 0x0C, 0x42);
+const auto backgroundBottom = juce::Colour::fromRGB(0x67, 0x10, 0x57);
+const auto cardFill = juce::Colour::fromRGBA(0x0B, 0x0E, 0x1E, 0xE0);
+const auto cardStroke = juce::Colour::fromRGBA(0xFF, 0x3B, 0xB7, 0x4A);
+const auto cardHighlight = juce::Colour::fromRGBA(0x8B, 0x4D, 0xFF, 0x3E);
+const auto cardHighlightStroke = juce::Colour::fromRGB(0xFF, 0x3B, 0xB7);
+const auto titleColour = juce::Colour::fromRGB(0xF7, 0xEA, 0xFF);
+const auto bodyColour = juce::Colour::fromRGB(0xB9, 0xA9, 0xD9);
+const auto accentColour = juce::Colour::fromRGB(0xFF, 0x3B, 0xB7);
+const auto accentSoft = juce::Colour::fromRGB(0x8B, 0x4D, 0xFF);
+const auto knobColour = juce::Colour::fromRGB(0x36, 0xC5, 0xFF);
+const auto knobTrackColour = juce::Colour::fromRGB(0x2A, 0x1D, 0x48);
+const auto sliderTrackColour = juce::Colour::fromRGBA(0xFF, 0x3B, 0xB7, 0x88);
+const auto successColour = juce::Colour::fromRGB(0x36, 0xC5, 0xFF);
+const auto panelButtonColour = juce::Colour::fromRGB(0x12, 0x10, 0x25);
+const auto textFieldColour = juce::Colour::fromRGBA(0x11, 0x0D, 0x21, 0xF2);
 
 juce::String sanitisePresetName(juce::String name)
 {
@@ -117,16 +121,16 @@ PlayerGUI::PlayerGUI()
     restorePresets();
 
     configureSectionLabel(titleLabel, "Soundscape Desktop", 28.0f, titleColour);
-    configureSectionLabel(subtitleLabel, "Pocket-style control surface for beds, loops, saved scenes, and layer shaping.", 14.0f, bodyColour);
+    configureSectionLabel(subtitleLabel, "Desktop mix surface for ambient beds, solo loops, saved scenes, and quick layer shaping.", 14.0f, bodyColour);
     configureSectionLabel(statusLabel, "Preparing audio...", 13.0f, bodyColour);
-    configureSectionLabel(masterSectionLabel, "Master Mix", 16.0f, titleColour);
-    configureSectionLabel(backgroundMasterLabel, "Bed Master", 13.0f, bodyColour);
-    configureSectionLabel(foregroundMasterLabel, "Loop Master", 13.0f, bodyColour);
+    configureSectionLabel(masterSectionLabel, "Pocket Mix", 16.0f, titleColour);
+    configureSectionLabel(backgroundMasterLabel, "Beds", 13.0f, bodyColour);
+    configureSectionLabel(foregroundMasterLabel, "Loops", 13.0f, bodyColour);
     configureSectionLabel(presetsSectionLabel, "Saved Scenes", 16.0f, titleColour);
     configureSectionLabel(bedsSectionLabel, "Ambient Beds", 16.0f, titleColour);
-    configureSectionLabel(layersSectionLabel, "Selected Bed Layers", 16.0f, titleColour);
+    configureSectionLabel(layersSectionLabel, "Layer Blend", 16.0f, titleColour);
     configureSectionLabel(selectedBankLabel, "Select a bed", 18.0f, titleColour);
-    configureSectionLabel(selectedBankHintLabel, "Layer blend is stored in presets and reset actions match Pocket.", 13.0f, bodyColour);
+    configureSectionLabel(selectedBankHintLabel, "Pick a bed to shape its layers. Reset keeps the bed on or off, just like Pocket.", 13.0f, bodyColour);
     configureSectionLabel(solosSectionLabel, "Solo Loops", 16.0f, titleColour);
     prepareLabel(presetCountLabel, "0 saved", 12.0f, bodyColour, juce::Justification::centredRight);
     prepareLabel(presetEmptyLabel, "Save the current scene to keep bed toggles, layer blend, loop pan, and master mix together.", 13.0f, bodyColour, juce::Justification::centred);
@@ -183,10 +187,12 @@ PlayerGUI::PlayerGUI()
     foregroundMasterSlider.addListener(this);
 
     presetNameEditor.setTextToShowWhenEmpty("Type a scene name", bodyColour.withAlpha(0.7f));
-    presetNameEditor.setColour(juce::TextEditor::backgroundColourId, juce::Colours::white.withAlpha(0.72f));
+    presetNameEditor.setColour(juce::TextEditor::backgroundColourId, textFieldColour);
     presetNameEditor.setColour(juce::TextEditor::outlineColourId, cardStroke);
     presetNameEditor.setColour(juce::TextEditor::focusedOutlineColourId, accentColour);
     presetNameEditor.setColour(juce::TextEditor::textColourId, titleColour);
+    presetNameEditor.setColour(juce::TextEditor::highlightColourId, accentSoft.withAlpha(0.32f));
+    presetNameEditor.setColour(juce::CaretComponent::caretColourId, titleColour);
     presetNameEditor.setFont(juce::Font(14.0f, juce::Font::plain));
     presetNameEditor.onTextChange = [this]
     {
@@ -287,13 +293,17 @@ void PlayerGUI::paint(juce::Graphics& g)
                                   0.0f,
                                   static_cast<float>(getHeight()),
                                   false);
+    gradient.addColour(0.32, backgroundBlue);
+    gradient.addColour(0.7, backgroundPurple);
     g.setGradientFill(gradient);
     g.fillAll();
 
-    g.setColour(accentSoft.withAlpha(0.16f));
-    g.fillEllipse(static_cast<float>(getWidth() - 310), -40.0f, 300.0f, 300.0f);
-    g.setColour(knobTrackColour.withAlpha(0.13f));
-    g.fillEllipse(-90.0f, static_cast<float>(getHeight() - 260), 260.0f, 260.0f);
+    g.setColour(accentColour.withAlpha(0.18f));
+    g.fillEllipse(static_cast<float>(getWidth() - 340), -60.0f, 340.0f, 340.0f);
+    g.setColour(knobColour.withAlpha(0.16f));
+    g.fillEllipse(-110.0f, static_cast<float>(getHeight() - 300), 320.0f, 320.0f);
+    g.setColour(accentSoft.withAlpha(0.14f));
+    g.fillEllipse(static_cast<float>(getWidth() * 0.34f), static_cast<float>(getHeight() - 180), 260.0f, 220.0f);
 
     drawCard(g, headerCardBounds);
     drawCard(g, masterCardBounds);
@@ -304,8 +314,15 @@ void PlayerGUI::paint(juce::Graphics& g)
 
     for (int bankIndex = 0; bankIndex < Player::numBackgroundBanks; ++bankIndex)
     {
-        const auto highlighted = bankIndex == selectedBackgroundBank || state.banks[bankIndex].active;
+        const auto highlighted = bankIndex == selectedBackgroundBank;
         drawCard(g, bankCardBounds[bankIndex], highlighted);
+
+        if (state.banks[bankIndex].active)
+        {
+            auto stripeBounds = bankCardBounds[bankIndex].withWidth(activeStripeWidth).reduced(0, 12).toFloat();
+            g.setColour(successColour.withAlpha(0.9f));
+            g.fillRoundedRectangle(stripeBounds, 3.0f);
+        }
     }
 
     for (int soundIndex = 0; soundIndex < Player::numForegroundSounds; ++soundIndex)
@@ -317,53 +334,53 @@ void PlayerGUI::paint(juce::Graphics& g)
 void PlayerGUI::resized()
 {
     auto bounds = getLocalBounds().reduced(outerPadding);
-    headerCardBounds = bounds.removeFromTop(96);
+    headerCardBounds = bounds.removeFromTop(104);
     bounds.removeFromTop(cardGap);
 
     if (getWidth() >= 1240)
     {
-        auto topRow = bounds.removeFromTop(340);
+        auto topRow = bounds.removeFromTop(356);
         bounds.removeFromTop(cardGap);
         auto bottomRow = bounds;
 
-        auto leftRail = topRow.removeFromLeft(360);
-        masterCardBounds = leftRail.removeFromTop(154);
+        auto leftRail = topRow.removeFromLeft(376);
+        masterCardBounds = leftRail.removeFromTop(168);
         leftRail.removeFromTop(cardGap);
         presetsCardBounds = leftRail;
         topRow.removeFromLeft(cardGap);
         bedsCardBounds = topRow;
 
-        auto bottomLeft = bottomRow.removeFromLeft(650);
+        auto bottomLeft = bottomRow.removeFromLeft(680);
         bottomRow.removeFromLeft(cardGap);
         layersCardBounds = bottomLeft;
         solosCardBounds = bottomRow;
     }
     else
     {
-        masterCardBounds = bounds.removeFromTop(156);
+        masterCardBounds = bounds.removeFromTop(168);
         bounds.removeFromTop(cardGap);
-        presetsCardBounds = bounds.removeFromTop(220);
+        presetsCardBounds = bounds.removeFromTop(236);
         bounds.removeFromTop(cardGap);
-        bedsCardBounds = bounds.removeFromTop(324);
+        bedsCardBounds = bounds.removeFromTop(350);
         bounds.removeFromTop(cardGap);
-        layersCardBounds = bounds.removeFromTop(250);
+        layersCardBounds = bounds.removeFromTop(280);
         bounds.removeFromTop(cardGap);
         solosCardBounds = bounds;
     }
 
     {
         auto inner = headerCardBounds.reduced(18, 16);
-        auto actions = inner.removeFromRight(310);
+        auto actions = inner.removeFromRight(332);
         titleLabel.setBounds(inner.removeFromTop(28));
         inner.removeFromTop(2);
         subtitleLabel.setBounds(inner.removeFromTop(20));
         inner.removeFromTop(6);
         statusLabel.setBounds(inner.removeFromTop(18));
 
-        auto actionRow = actions.removeFromTop(34);
-        stopAllButton.setBounds(actionRow.removeFromLeft(144));
+        auto actionRow = actions.removeFromTop(36);
+        stopAllButton.setBounds(actionRow.removeFromLeft(152));
         actionRow.removeFromLeft(10);
-        resetAllSlidersButton.setBounds(actionRow.removeFromLeft(156));
+        resetAllSlidersButton.setBounds(actionRow);
     }
 
     {
@@ -371,20 +388,20 @@ void PlayerGUI::resized()
         masterSectionLabel.setBounds(inner.removeFromTop(24));
         inner.removeFromTop(8);
 
-        auto backgroundRow = inner.removeFromTop(44);
-        backgroundMasterLabel.setBounds(backgroundRow.removeFromLeft(92));
+        auto backgroundRow = inner.removeFromTop(46);
+        backgroundMasterLabel.setBounds(backgroundRow.removeFromLeft(104));
         backgroundRow.removeFromLeft(10);
         backgroundMasterSlider.setBounds(backgroundRow);
 
         inner.removeFromTop(8);
 
-        auto foregroundRow = inner.removeFromTop(44);
-        foregroundMasterLabel.setBounds(foregroundRow.removeFromLeft(92));
+        auto foregroundRow = inner.removeFromTop(46);
+        foregroundMasterLabel.setBounds(foregroundRow.removeFromLeft(104));
         foregroundRow.removeFromLeft(10);
         foregroundMasterSlider.setBounds(foregroundRow);
 
         inner.removeFromTop(10);
-        auto presetRow = inner.removeFromTop(34);
+        auto presetRow = inner.removeFromTop(36);
         const auto buttonWidth = (presetRow.getWidth() - 16) / 3;
         driftPresetButton.setBounds(presetRow.removeFromLeft(buttonWidth));
         presetRow.removeFromLeft(8);
@@ -403,7 +420,7 @@ void PlayerGUI::resized()
         presetNameEditor.setBounds(inner.removeFromTop(34));
         inner.removeFromTop(8);
 
-        auto buttonsRow = inner.removeFromTop(34);
+        auto buttonsRow = inner.removeFromTop(36);
         const auto buttonWidth = (buttonsRow.getWidth() - 16) / 3;
         savePresetButton.setBounds(buttonsRow.removeFromLeft(buttonWidth));
         buttonsRow.removeFromLeft(8);
@@ -421,31 +438,46 @@ void PlayerGUI::resized()
         bedsSectionLabel.setBounds(inner.removeFromTop(24));
         inner.removeFromTop(10);
 
+        const auto useThreeColumns = inner.getWidth() >= 860;
+        const auto columnCount = useThreeColumns ? 3 : 2;
+        const auto rowCount = (Player::numBackgroundBanks + columnCount - 1) / columnCount;
         const auto gridWidth = inner.getWidth();
+        const auto gridHeight = inner.getHeight();
         const auto columnGap = 12;
-        const auto columnWidth = (gridWidth - columnGap) / 2;
         const auto rowGap = 10;
+        const auto columnWidth = (gridWidth - columnGap * (columnCount - 1)) / columnCount;
+        const auto cardHeight = (gridHeight - rowGap * (rowCount - 1)) / rowCount;
 
         for (int bankIndex = 0; bankIndex < Player::numBackgroundBanks; ++bankIndex)
         {
-            const auto rowIndex = bankIndex / 2;
-            const auto columnIndex = bankIndex % 2;
+            const auto rowIndex = bankIndex / columnCount;
+            const auto columnIndex = bankIndex % columnCount;
             const auto x = inner.getX() + (columnWidth + columnGap) * columnIndex;
-            const auto y = inner.getY() + (bankCardHeight + rowGap) * rowIndex;
-            bankCardBounds[bankIndex] = { x, y, columnWidth, bankCardHeight };
+            const auto y = inner.getY() + (cardHeight + rowGap) * rowIndex;
+            bankCardBounds[bankIndex] = { x, y, columnWidth, cardHeight };
 
-            auto cardInner = bankCardBounds[bankIndex].reduced(12, 10);
-            auto topRow = cardInner.removeFromTop(30);
-            bankToggleButtons[bankIndex].setBounds(topRow.removeFromRight(84));
+            const auto compactCard = cardHeight < 104 || columnWidth < 320;
+            const auto horizontalPadding = compactCard ? 10 : 14;
+            const auto verticalPadding = compactCard ? 8 : 12;
+            const auto topRowHeight = compactCard ? 24 : 34;
+            const auto toggleWidth = compactCard ? 74 : 96;
+            const auto resetWidth = compactCard ? 56 : 72;
+            const auto sectionGap = compactCard ? 4 : 8;
+            const auto summaryHeight = compactCard ? 14 : 20;
+            const auto sliderHeight = compactCard ? 22 : 32;
+
+            auto cardInner = bankCardBounds[bankIndex].reduced(horizontalPadding, verticalPadding);
+            auto topRow = cardInner.removeFromTop(topRowHeight);
+            bankToggleButtons[bankIndex].setBounds(topRow.removeFromRight(toggleWidth));
             topRow.removeFromRight(8);
-            bankResetButtons[bankIndex].setBounds(topRow.removeFromRight(84));
+            bankResetButtons[bankIndex].setBounds(topRow.removeFromRight(resetWidth));
             topRow.removeFromRight(8);
             bankSelectButtons[bankIndex].setBounds(topRow);
 
-            cardInner.removeFromTop(8);
-            bankSummaryLabels[bankIndex].setBounds(cardInner.removeFromTop(18));
-            cardInner.removeFromTop(6);
-            bankVolumeSliders[bankIndex].setBounds(cardInner.removeFromTop(30));
+            cardInner.removeFromTop(sectionGap);
+            bankSummaryLabels[bankIndex].setBounds(cardInner.removeFromTop(summaryHeight));
+            cardInner.removeFromTop(sectionGap);
+            bankVolumeSliders[bankIndex].setBounds(cardInner.removeFromTop(sliderHeight));
         }
     }
 
@@ -453,8 +485,8 @@ void PlayerGUI::resized()
         auto inner = layersCardBounds.reduced(18, 14);
         layersSectionLabel.setBounds(inner.removeFromTop(24));
         inner.removeFromTop(6);
-        selectedBankLabel.setBounds(inner.removeFromTop(26));
-        selectedBankHintLabel.setBounds(inner.removeFromTop(20));
+        selectedBankLabel.setBounds(inner.removeFromTop(28));
+        selectedBankHintLabel.setBounds(inner.removeFromTop(22));
         inner.removeFromTop(10);
 
         const auto visibleLayerCount = getBackgroundLayerCount(selectedBackgroundBank);
@@ -467,8 +499,8 @@ void PlayerGUI::resized()
                 continue;
             }
 
-            auto row = inner.removeFromTop(28);
-            layerLabels[layerIndex].setBounds(row.removeFromLeft(150));
+            auto row = inner.removeFromTop(30);
+            layerLabels[layerIndex].setBounds(row.removeFromLeft(170));
             row.removeFromLeft(10);
             layerSliders[layerIndex].setBounds(row);
             inner.removeFromTop(8);
@@ -486,9 +518,9 @@ void PlayerGUI::resized()
             soloCardBounds[soundIndex] = rowBounds;
 
             auto row = rowBounds.reduced(12, 10);
-            soloToggleButtons[soundIndex].setBounds(row.removeFromLeft(138));
+            soloToggleButtons[soundIndex].setBounds(row.removeFromLeft(156));
             row.removeFromLeft(10);
-            auto panBounds = row.removeFromRight(150);
+            auto panBounds = row.removeFromRight(164);
             row.removeFromRight(10);
             soloVolumeSliders[soundIndex].setBounds(row);
             soloPanSliders[soundIndex].setBounds(panBounds);
@@ -655,7 +687,7 @@ void PlayerGUI::paintListBoxItem(int rowNumber,
     }
 
     const auto bounds = juce::Rectangle<int>(0, 0, width, height).reduced(2);
-    g.setColour(rowIsSelected ? accentSoft.withAlpha(0.35f) : juce::Colours::white.withAlpha(0.48f));
+    g.setColour(rowIsSelected ? accentSoft.withAlpha(0.3f) : juce::Colour::fromRGBA(0x11, 0x0E, 0x22, 0xD8));
     g.fillRoundedRectangle(bounds.toFloat(), 12.0f);
     g.setColour(rowIsSelected ? accentColour : cardStroke);
     g.drawRoundedRectangle(bounds.toFloat(), 12.0f, rowIsSelected ? 1.8f : 1.0f);
@@ -845,7 +877,7 @@ juce::String PlayerGUI::summarisePreset(const SavedPreset& preset) const
     return pluralise(activeBanks, "bed", "beds")
         + ", "
         + pluralise(activeSolos, "loop", "loops")
-        + " · Mix "
+        + " | Mix "
         + juce::String(static_cast<int>(preset.state.masterBackground))
         + "/"
         + juce::String(static_cast<int>(preset.state.masterSolo));
@@ -912,15 +944,19 @@ juce::String PlayerGUI::formatPanLabel(float pan) const
 
 void PlayerGUI::initialiseLookAndFeel()
 {
-    lookAndFeel.setColour(juce::TextButton::buttonColourId, juce::Colour::fromRGB(0xF7, 0xED, 0xE5));
-    lookAndFeel.setColour(juce::TextButton::buttonOnColourId, accentColour);
+    lookAndFeel.setColour(juce::TextButton::buttonColourId, panelButtonColour);
+    lookAndFeel.setColour(juce::TextButton::buttonOnColourId, accentSoft);
     lookAndFeel.setColour(juce::TextButton::textColourOffId, titleColour);
     lookAndFeel.setColour(juce::TextButton::textColourOnId, juce::Colours::white);
     lookAndFeel.setColour(juce::Slider::thumbColourId, juce::Colours::white);
     lookAndFeel.setColour(juce::Slider::trackColourId, sliderTrackColour);
-    lookAndFeel.setColour(juce::Slider::backgroundColourId, knobTrackColour.withAlpha(0.35f));
+    lookAndFeel.setColour(juce::Slider::backgroundColourId, knobTrackColour.withAlpha(0.55f));
     lookAndFeel.setColour(juce::Slider::rotarySliderFillColourId, knobColour);
     lookAndFeel.setColour(juce::Slider::rotarySliderOutlineColourId, knobTrackColour);
+    lookAndFeel.setColour(juce::Slider::textBoxTextColourId, titleColour);
+    lookAndFeel.setColour(juce::Slider::textBoxBackgroundColourId, textFieldColour);
+    lookAndFeel.setColour(juce::Slider::textBoxOutlineColourId, cardStroke);
+    lookAndFeel.setColour(juce::Slider::textBoxHighlightColourId, accentSoft.withAlpha(0.28f));
     lookAndFeel.setColour(juce::Label::textColourId, bodyColour);
     lookAndFeel.setColour(juce::ListBox::outlineColourId, juce::Colours::transparentBlack);
 }
@@ -1059,7 +1095,7 @@ void PlayerGUI::configurePrimaryButton(juce::TextButton& button)
 
 void PlayerGUI::configureSecondaryButton(juce::TextButton& button)
 {
-    button.setColour(juce::TextButton::buttonColourId, juce::Colour::fromRGB(0xF7, 0xED, 0xE5));
+    button.setColour(juce::TextButton::buttonColourId, panelButtonColour);
     button.setColour(juce::TextButton::textColourOffId, titleColour);
     button.setColour(juce::TextButton::buttonOnColourId, accentSoft);
     button.setTriggeredOnMouseDown(false);
@@ -1083,7 +1119,11 @@ void PlayerGUI::configureHorizontalSlider(juce::Slider& slider, bool bipolar)
     slider.setRange(bipolar ? -100.0 : 0.0, 100.0, 1.0);
     slider.setColour(juce::Slider::thumbColourId, juce::Colours::white);
     slider.setColour(juce::Slider::trackColourId, sliderTrackColour);
-    slider.setColour(juce::Slider::backgroundColourId, knobTrackColour.withAlpha(0.28f));
+    slider.setColour(juce::Slider::backgroundColourId, knobTrackColour.withAlpha(0.42f));
+    slider.setColour(juce::Slider::textBoxTextColourId, titleColour);
+    slider.setColour(juce::Slider::textBoxBackgroundColourId, textFieldColour);
+    slider.setColour(juce::Slider::textBoxOutlineColourId, cardStroke);
+    slider.setColour(juce::Slider::textBoxHighlightColourId, accentSoft.withAlpha(0.28f));
 }
 
 void PlayerGUI::updateLoadState()
@@ -1182,11 +1222,11 @@ void PlayerGUI::updatePresetButtons()
     const auto detailSelected = std::abs(state.masterBackground - detailBackground) < 0.5f
         && std::abs(state.masterSolo - detailSolo) < 0.5f;
 
-    driftPresetButton.setColour(juce::TextButton::buttonColourId, driftSelected ? accentColour : juce::Colour::fromRGB(0xF7, 0xED, 0xE5));
+    driftPresetButton.setColour(juce::TextButton::buttonColourId, driftSelected ? accentColour : panelButtonColour);
     driftPresetButton.setColour(juce::TextButton::textColourOffId, driftSelected ? juce::Colours::white : titleColour);
-    focusPresetButton.setColour(juce::TextButton::buttonColourId, focusSelected ? accentColour : juce::Colour::fromRGB(0xF7, 0xED, 0xE5));
+    focusPresetButton.setColour(juce::TextButton::buttonColourId, focusSelected ? accentColour : panelButtonColour);
     focusPresetButton.setColour(juce::TextButton::textColourOffId, focusSelected ? juce::Colours::white : titleColour);
-    detailPresetButton.setColour(juce::TextButton::buttonColourId, detailSelected ? accentColour : juce::Colour::fromRGB(0xF7, 0xED, 0xE5));
+    detailPresetButton.setColour(juce::TextButton::buttonColourId, detailSelected ? accentColour : panelButtonColour);
     detailPresetButton.setColour(juce::TextButton::textColourOffId, detailSelected ? juce::Colours::white : titleColour);
 
     loadPresetButton.setEnabled(audioControlsEnabled && selectedPresetRow >= 0 && selectedPresetRow < static_cast<int>(savedPresets.size()));
@@ -1226,9 +1266,10 @@ void PlayerGUI::updateSelectedBankUi()
     const auto bankName = getBackgroundBankName(selectedBackgroundBank);
     const auto layerCount = getBackgroundLayerCount(selectedBackgroundBank);
 
-    selectedBankLabel.setText(bankName.isNotEmpty() ? bankName : "Select a bed", juce::dontSendNotification);
+    const auto bankIsActive = state.banks[selectedBackgroundBank].active;
+    selectedBankLabel.setText(bankName.isNotEmpty() ? bankName + (bankIsActive ? " | Live" : " | Standby") : "Select a bed", juce::dontSendNotification);
     selectedBankHintLabel.setText(layerCount > 0
-                                      ? juce::String(layerCount) + " layer" + (layerCount == 1 ? "" : "s") + " available. Pocket-style reset preserves the bed on/off state."
+                                      ? juce::String(layerCount) + " layer" + (layerCount == 1 ? "" : "s") + " ready | Reset keeps the bed on/off state."
                                       : "Audio labels will populate after the library is ready.",
                                   juce::dontSendNotification);
 
@@ -1265,21 +1306,29 @@ void PlayerGUI::updateBankCards()
         const auto layerCount = getBackgroundLayerCount(bankIndex);
         const auto name = getBackgroundBankName(bankIndex);
 
-        bankSelectButtons[bankIndex].setButtonText(name + (selected ? "  Selected" : ""));
-        bankToggleButtons[bankIndex].setButtonText(active ? "Bed On" : "Bed Off");
-        bankResetButtons[bankIndex].setButtonText("Reset Bed");
+        bankSelectButtons[bankIndex].setButtonText(name);
+        bankToggleButtons[bankIndex].setButtonText(active ? "Live" : "Standby");
+        bankResetButtons[bankIndex].setButtonText("Reset");
         bankVolumeSliders[bankIndex].setValue(state.banks[bankIndex].volume, juce::dontSendNotification);
+        bankSelectButtons[bankIndex].setTooltip(selected ? "Currently editing layer blend for " + name + "." : "Select " + name + " to edit its layer blend.");
+        bankToggleButtons[bankIndex].setTooltip(active ? "Fade " + name + " out." : "Fade " + name + " in.");
+        bankResetButtons[bankIndex].setTooltip("Reset " + name + " scene level and layer blend.");
+        bankVolumeSliders[bankIndex].setTooltip(name + " scene level");
 
-        bankSelectButtons[bankIndex].setColour(juce::TextButton::buttonColourId, selected ? accentSoft : juce::Colour::fromRGB(0xF7, 0xED, 0xE5));
+        bankSelectButtons[bankIndex].setColour(juce::TextButton::buttonColourId, selected ? accentSoft : panelButtonColour);
         bankSelectButtons[bankIndex].setColour(juce::TextButton::textColourOffId, selected ? juce::Colours::white : titleColour);
-        bankToggleButtons[bankIndex].setColour(juce::TextButton::buttonColourId, active ? successColour : juce::Colour::fromRGB(0xF7, 0xED, 0xE5));
+        bankToggleButtons[bankIndex].setColour(juce::TextButton::buttonColourId, active ? accentColour : panelButtonColour);
         bankToggleButtons[bankIndex].setColour(juce::TextButton::textColourOffId, active ? juce::Colours::white : titleColour);
 
+        juce::String summary = active ? "Live" : "Standby";
+        if (selected)
+        {
+            summary = "Selected | " + summary;
+        }
+
         bankSummaryLabels[bankIndex].setText(
-            (active ? "Live" : "Standby")
-                + juce::String(" · ")
-                + juce::String(static_cast<int>(state.banks[bankIndex].volume))
-                + "% · "
+            summary
+                + juce::String(" | ")
                 + juce::String(layerCount)
                 + " layer"
                 + (layerCount == 1 ? "" : "s"),
@@ -1292,12 +1341,15 @@ void PlayerGUI::updateSoloCards()
     for (int soundIndex = 0; soundIndex < Player::numForegroundSounds; ++soundIndex)
     {
         const auto active = state.solos[soundIndex].active;
-        soloToggleButtons[soundIndex].setButtonText(getForegroundSoundName(soundIndex));
+        const auto soundName = getForegroundSoundName(soundIndex);
+        soloToggleButtons[soundIndex].setButtonText(soundName);
         soloVolumeSliders[soundIndex].setValue(state.solos[soundIndex].volume, juce::dontSendNotification);
         soloPanSliders[soundIndex].setValue(state.solos[soundIndex].pan, juce::dontSendNotification);
-        soloPanSliders[soundIndex].setTooltip(formatPanLabel(state.solos[soundIndex].pan));
+        soloToggleButtons[soundIndex].setTooltip(active ? "Fade " + soundName + " out." : "Fade " + soundName + " in.");
+        soloVolumeSliders[soundIndex].setTooltip(soundName + " level");
+        soloPanSliders[soundIndex].setTooltip(soundName + " pan: " + formatPanLabel(state.solos[soundIndex].pan));
 
-        soloToggleButtons[soundIndex].setColour(juce::TextButton::buttonColourId, active ? successColour : juce::Colour::fromRGB(0xF7, 0xED, 0xE5));
+        soloToggleButtons[soundIndex].setColour(juce::TextButton::buttonColourId, active ? accentColour : panelButtonColour);
         soloToggleButtons[soundIndex].setColour(juce::TextButton::textColourOffId, active ? juce::Colours::white : titleColour);
     }
 }
@@ -1329,7 +1381,7 @@ void PlayerGUI::updateStatusText()
             statusLabel.setColour(juce::Label::textColourId, bodyColour);
             break;
         case LoadState::Ready:
-            statusLabel.setText("Audio ready. Pocket-style presets and resets are live.", juce::dontSendNotification);
+            statusLabel.setText("Audio ready. Beds, loops, presets, and 1-second fades are live.", juce::dontSendNotification);
             statusLabel.setColour(juce::Label::textColourId, successColour.darker(0.12f));
             break;
         case LoadState::Failed:

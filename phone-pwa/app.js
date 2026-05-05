@@ -481,7 +481,7 @@ function persistSavedPresets() {
 function summarizePreset(savedPreset) {
     const activeBanks = savedPreset.state.banks.filter((bank) => bank.active).length;
     const activeSolos = savedPreset.state.solos.filter((solo) => solo.active).length;
-    return `${activeBanks} bed${activeBanks === 1 ? "" : "s"}, ${activeSolos} loop${activeSolos === 1 ? "" : "s"} · Mix ${savedPreset.state.masterBackground}/${savedPreset.state.masterSolo}`;
+    return `${activeBanks} bed${activeBanks === 1 ? "" : "s"}, ${activeSolos} loop${activeSolos === 1 ? "" : "s"} | Mix ${savedPreset.state.masterBackground}/${savedPreset.state.masterSolo}`;
 }
 
 function renderSavedPresets() {
@@ -794,7 +794,7 @@ function getBankSummaryLabel(bankState, resolvedMode) {
     }
 
     if (desiredMode === "custom") {
-        return "Custom saved · stem live";
+        return "Custom saved | stem live";
     }
 
     return "Stem blend";
@@ -1085,7 +1085,7 @@ function updateCounts() {
     const activeBanks = state.banks.filter((bank) => bank.active).length;
     const activeSolos = state.solos.filter((solo) => solo.active).length;
     const playbackPlan = computePlaybackPlan();
-    dom.bankCount.textContent = `${activeBanks} active · ${playbackPlan.totalUnits}/${maxActiveStreamUnits} units`;
+    dom.bankCount.textContent = `${activeBanks} active | ${playbackPlan.totalUnits}/${maxActiveStreamUnits} units`;
     dom.soloCount.textContent = `${activeSolos} active`;
 }
 
