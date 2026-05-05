@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#050611">
     <title>Soundscape Pocket</title>
     <link rel="manifest" href="manifest.webmanifest">
-    <link rel="stylesheet" href="app.css?v=20260505a">
+    <link rel="stylesheet" href="app.css?v=20260505c">
 </head>
 <body>
     <div class="ambient-glow ambient-glow-one"></div>
@@ -84,9 +84,24 @@
                     <p class="eyebrow">Soundscapes</p>
                     <h2>Layered ambient beds</h2>
                 </div>
-                <span id="bank-count" class="status-chip">0 active</span>
+                <div class="section-actions carousel-actions">
+                    <button id="bank-prev" class="status-chip carousel-nav" type="button" aria-label="Previous bed">Prev</button>
+                    <button id="bank-next" class="status-chip carousel-nav" type="button" aria-label="Next bed">Next</button>
+                    <span id="bank-count" class="status-chip">0 active</span>
+                </div>
             </div>
-            <div id="bank-grid" class="card-grid"></div>
+            <div id="bank-grid" class="carousel-stage" role="list" aria-label="Ambient beds"></div>
+            <section id="layer-panel" class="detail-panel" aria-labelledby="layer-panel-title">
+                <div class="detail-panel-heading">
+                    <div>
+                        <p class="eyebrow">Layer Blend</p>
+                        <h3 id="layer-panel-title">Selected bed</h3>
+                    </div>
+                    <span id="layer-panel-status" class="status-chip">Standby</span>
+                </div>
+                <p id="layer-panel-copy" class="card-note">Choose a bed to adjust its layer blend in one shared window.</p>
+                <div id="layer-panel-mixer" class="layer-mixer detail-layer-mixer"></div>
+            </section>
         </section>
 
         <section id="solo-section" class="panel section-panel">
@@ -95,9 +110,35 @@
                     <p class="eyebrow">Solo Sounds</p>
                     <h2>Foreground loops</h2>
                 </div>
-                <span id="solo-count" class="status-chip">0 active</span>
+                <div class="section-actions carousel-actions">
+                    <button id="solo-prev" class="status-chip carousel-nav" type="button" aria-label="Previous loop">Prev</button>
+                    <button id="solo-next" class="status-chip carousel-nav" type="button" aria-label="Next loop">Next</button>
+                    <span id="solo-count" class="status-chip">0 active</span>
+                </div>
             </div>
-            <div id="solo-grid" class="card-grid"></div>
+            <div id="solo-grid" class="carousel-stage" role="list" aria-label="Foreground loops"></div>
+            <section id="solo-panel" class="detail-panel" aria-labelledby="solo-panel-title">
+                <div class="detail-panel-heading">
+                    <div>
+                        <p class="eyebrow">Loop Focus</p>
+                        <h3 id="solo-panel-title">Selected loop</h3>
+                    </div>
+                    <span id="solo-panel-status" class="status-chip">Standby</span>
+                </div>
+                <p id="solo-panel-copy" class="card-note">Choose a foreground loop to shape its level and pan in one shared window.</p>
+                <div class="control-grid detail-control-grid">
+                    <label class="control-label" for="solo-panel-volume">
+                        <span>Level</span>
+                        <input id="solo-panel-volume" type="range" min="0" max="100" step="1">
+                        <strong id="solo-panel-volume-readout">62%</strong>
+                    </label>
+                    <label class="control-label" for="solo-panel-pan">
+                        <span>Pan</span>
+                        <input id="solo-panel-pan" type="range" min="-100" max="100" step="1">
+                        <strong id="solo-panel-pan-readout">Center</strong>
+                    </label>
+                </div>
+            </section>
         </section>
     </main>
 
@@ -108,6 +149,6 @@
         <button class="dock-button" type="button" id="jump-solos">Loops</button>
     </nav>
 
-    <script src="app.js?v=20260505a"></script>
+    <script src="app.js?v=20260505c"></script>
 </body>
 </html>

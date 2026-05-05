@@ -139,8 +139,25 @@ const dom = {
     masterSoloReadout: document.querySelector("#master-solo-readout"),
     bankGrid: document.querySelector("#bank-grid"),
     soloGrid: document.querySelector("#solo-grid"),
+    bankPrev: document.querySelector("#bank-prev"),
+    bankNext: document.querySelector("#bank-next"),
+    soloPrev: document.querySelector("#solo-prev"),
+    soloNext: document.querySelector("#solo-next"),
     bankCount: document.querySelector("#bank-count"),
     soloCount: document.querySelector("#solo-count"),
+    layerPanel: document.querySelector("#layer-panel"),
+    layerPanelTitle: document.querySelector("#layer-panel-title"),
+    layerPanelStatus: document.querySelector("#layer-panel-status"),
+    layerPanelCopy: document.querySelector("#layer-panel-copy"),
+    layerPanelMixer: document.querySelector("#layer-panel-mixer"),
+    soloPanel: document.querySelector("#solo-panel"),
+    soloPanelTitle: document.querySelector("#solo-panel-title"),
+    soloPanelStatus: document.querySelector("#solo-panel-status"),
+    soloPanelCopy: document.querySelector("#solo-panel-copy"),
+    soloPanelVolume: document.querySelector("#solo-panel-volume"),
+    soloPanelVolumeReadout: document.querySelector("#solo-panel-volume-readout"),
+    soloPanelPan: document.querySelector("#solo-panel-pan"),
+    soloPanelPanReadout: document.querySelector("#solo-panel-pan-readout"),
     presetButtons: Array.from(document.querySelectorAll("[data-role='mix-preset']")),
     presetName: document.querySelector("#preset-name"),
     savePresetButton: document.querySelector("#save-preset"),
@@ -159,6 +176,9 @@ let backgroundBus = null;
 let soloBus = null;
 let compressor = null;
 let masterBus = null;
+let selectedBankIndex = 0;
+let selectedSoloIndex = 0;
+const carouselSwipeThreshold = 44;
 
 const trackEngines = new Map();
 const bankPlaybackStates = [];
@@ -182,6 +202,7 @@ async function initialize() {
 
     state = loadState();
     savedPresets = loadSavedPresets();
+    ensureValidSelections();
 
     dom.masterBackground.value = String(state.masterBackground);
     dom.masterSolo.value = String(state.masterSolo);
@@ -245,6 +266,52 @@ async function initialize() {
 
     dom.jumpSolos.addEventListener("click", () => {
         dom.soloSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    attachCarouselGestures(dom.bankGrid,
+        () => setSelectedBank(selectedBankIndex - 1),
+        () => setSelectedBank(selectedBankIndex + 1));
+
+    attachCarouselGestures(dom.soloGrid,
+        () => setSelectedSolo(selectedSoloIndex - 1),
+        () => setSelectedSolo(selectedSoloIndex + 1));
+
+    dom.bankPrev?.addEventListener("click", () => {
+        setSelectedBank(selectedBankIndex - 1, { scrollCard: true });
+    });
+
+    dom.bankNext?.addEventListener("click", () => {
+        setSelectedBank(selectedBankIndex + 1, { scrollCard: true });
+    });
+
+    dom.soloPrev?.addEventListener("click", () => {
+        setSelectedSolo(selectedSoloIndex - 1, { scrollCard: true });
+    });
+
+    dom.soloNext?.addEventListener("click", () => {
+        setSelectedSolo(selectedSoloIndex + 1, { scrollCard: true });
+    });
+
+    dom.soloPanelVolume?.addEventListener("input", () => {
+        if (selectedSoloIndex < 0) {
+            return;
+        }
+
+        state.solos[selectedSoloIndex].volume = Number(dom.soloPanelVolume.value);
+        persistState();
+        updateAllGains();
+        refreshCardStates();
+    });
+
+    dom.soloPanelPan?.addEventListener("input", () => {
+        if (selectedSoloIndex < 0) {
+            return;
+        }
+
+        state.solos[selectedSoloIndex].pan = Number(dom.soloPanelPan.value);
+        persistState();
+        updateAllGains();
+        refreshCardStates();
     });
 
     syncWakeButtonState();
@@ -800,18 +867,186 @@ function getBankSummaryLabel(bankState, resolvedMode) {
     return "Stem blend";
 }
 
-function setBankMixerExpanded(card, expanded) {
-    const toggle = card.querySelector("[data-role='bank-blend-toggle']");
-    const mixer = card.querySelector("[data-role='bank-layer-mixer']");
+function ensureValidSelections() {
+    selectedBankIndex = bankDefinitions.length > 0
+        ? Math.min(Math.max(selectedBankIndex, 0), bankDefinitions.length - 1)
+        : -1;
+    selectedSoloIndex = soloDefinitions.length > 0
+        ? Math.min(Math.max(selectedSoloIndex, 0), soloDefinitions.length - 1)
+        : -1;
+}
 
-    if (!toggle || !mixer) {
+function wrapIndex(index, length) {
+    if (length <= 0) {
+        return -1;
+    }
+
+    return ((index % length) + length) % length;
+}
+
+function attachCarouselGestures(track, onPrev, onNext) {
+    if (!track) {
         return;
     }
 
-    card.classList.toggle("is-expanded", expanded);
-    mixer.hidden = !expanded;
-    toggle.setAttribute("aria-expanded", String(expanded));
-    toggle.textContent = expanded ? "Hide layers" : "Blend layers";
+    const pointerState = {
+        active: false,
+        pointerId: -1,
+        startX: 0,
+        startY: 0
+    };
+
+    const resetPointerState = () => {
+        pointerState.active = false;
+        pointerState.pointerId = -1;
+        pointerState.startX = 0;
+        pointerState.startY = 0;
+    };
+
+    track.addEventListener("pointerdown", (event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) {
+            return;
+        }
+
+        if (event.target.closest("button, input, label")) {
+            return;
+        }
+
+        pointerState.active = true;
+        pointerState.pointerId = event.pointerId;
+        pointerState.startX = event.clientX;
+        pointerState.startY = event.clientY;
+        track.setPointerCapture?.(event.pointerId);
+    });
+
+    track.addEventListener("pointerup", (event) => {
+        if (!pointerState.active || event.pointerId !== pointerState.pointerId) {
+            return;
+        }
+
+        const deltaX = event.clientX - pointerState.startX;
+        const deltaY = event.clientY - pointerState.startY;
+        track.releasePointerCapture?.(event.pointerId);
+        resetPointerState();
+
+        if (Math.abs(deltaX) < carouselSwipeThreshold || Math.abs(deltaX) <= Math.abs(deltaY)) {
+            return;
+        }
+
+        if (deltaX < 0) {
+            onNext();
+            return;
+        }
+
+        onPrev();
+    });
+
+    track.addEventListener("pointercancel", () => {
+        resetPointerState();
+    });
+}
+
+function setSelectedBank(index, { scrollPanel = false, scrollCard = false } = {}) {
+    if (bankDefinitions.length === 0) {
+        return;
+    }
+
+    selectedBankIndex = wrapIndex(index, bankDefinitions.length);
+    refreshCardStates();
+
+    if (scrollPanel && dom.layerPanel) {
+        dom.layerPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+}
+
+function setSelectedSolo(index, { scrollCard = false, scrollPanel = false } = {}) {
+    if (soloDefinitions.length === 0) {
+        return;
+    }
+
+    selectedSoloIndex = wrapIndex(index, soloDefinitions.length);
+    refreshCardStates();
+
+    if (scrollPanel && dom.soloPanel) {
+        dom.soloPanel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+}
+
+function renderSelectedBankPanel(playbackPlan = computePlaybackPlan()) {
+    ensureValidSelections();
+
+    if (!dom.layerPanel || !dom.layerPanelMixer || selectedBankIndex < 0) {
+        return;
+    }
+
+    const bank = bankDefinitions[selectedBankIndex];
+    const bankState = state.banks[selectedBankIndex];
+    const resolvedMode = playbackPlan.bankModes[selectedBankIndex];
+    const layerCountLabel = `${bank.tracks.length} layer${bank.tracks.length === 1 ? "" : "s"}`;
+
+    dom.layerPanelTitle.textContent = bank.title;
+    dom.layerPanelStatus.textContent = bankState.active ? "Live" : "Standby";
+    dom.layerPanelStatus.classList.toggle("is-live", bankState.active);
+    dom.layerPanelCopy.textContent = `${bank.note} ${layerCountLabel}. ${getBankSummaryLabel(bankState, resolvedMode)}.`;
+    dom.layerPanelMixer.innerHTML = bank.tracks.map((path, layerIndex) => `
+        <label class="layer-row">
+            <div class="layer-row-head">
+                <span class="layer-name">${bank.trackLabels?.[layerIndex] || getTrackLabel(path)}</span>
+                <strong class="layer-readout" data-role="bank-layer-readout" data-index="${selectedBankIndex}" data-layer-index="${layerIndex}">100%</strong>
+            </div>
+            <input type="range" min="0" max="100" step="1" data-role="bank-layer-volume" data-index="${selectedBankIndex}" data-layer-index="${layerIndex}">
+        </label>
+    `).join("");
+
+    dom.layerPanelMixer.querySelectorAll("[data-role='bank-layer-volume']").forEach((slider) => {
+        const layerIndex = Number(slider.dataset.layerIndex);
+        const layerVolume = bankState.layerVolumes[layerIndex];
+        const layerReadout = dom.layerPanelMixer.querySelector(`[data-role='bank-layer-readout'][data-layer-index='${layerIndex}']`);
+        slider.value = String(layerVolume);
+        layerReadout.textContent = `${layerVolume}%`;
+
+        slider.addEventListener("input", () => {
+            const nextLayerVolumes = [...state.banks[selectedBankIndex].layerVolumes];
+            nextLayerVolumes[layerIndex] = Number(slider.value);
+
+            const nextMixMode = areLayerVolumesDefault(nextLayerVolumes) ? "stem" : "custom";
+            state.banks[selectedBankIndex] = {
+                ...state.banks[selectedBankIndex],
+                layerVolumes: nextLayerVolumes,
+                mixMode: nextMixMode,
+                mixPriority: nextMixMode === "custom" ? getNextMixPriority() : 0
+            };
+
+            persistState();
+            const nextPlaybackPlan = computePlaybackPlan();
+            if (state.banks[selectedBankIndex].active && nextMixMode === "custom" && nextPlaybackPlan.bankModes[selectedBankIndex] !== "custom") {
+                dom.statusText.textContent = "Custom blend saved, but stem mode is live until some streams are turned off.";
+            }
+
+            syncPlayback();
+            refreshCardStates();
+        });
+    });
+}
+
+function renderSelectedSoloPanel() {
+    ensureValidSelections();
+
+    if (!dom.soloPanel || selectedSoloIndex < 0) {
+        return;
+    }
+
+    const solo = soloDefinitions[selectedSoloIndex];
+    const soloState = state.solos[selectedSoloIndex];
+
+    dom.soloPanelTitle.textContent = solo.title;
+    dom.soloPanelStatus.textContent = soloState.active ? "Live" : "Standby";
+    dom.soloPanelStatus.classList.toggle("is-live", soloState.active);
+    dom.soloPanelCopy.textContent = `${solo.note} Level ${soloState.volume}% | ${formatPan(soloState.pan)}.`;
+    dom.soloPanelVolume.value = String(soloState.volume);
+    dom.soloPanelVolumeReadout.textContent = `${soloState.volume}%`;
+    dom.soloPanelPan.value = String(soloState.pan);
+    dom.soloPanelPanReadout.textContent = formatPan(soloState.pan);
 }
 
 function resetBankSliders(bankIndex) {
@@ -835,11 +1070,12 @@ function resetAllSliders() {
 
 function renderBankCards() {
     dom.bankGrid.innerHTML = "";
+    ensureValidSelections();
 
     bankDefinitions.forEach((bank, index) => {
         const layerCountLabel = `${bank.tracks.length} looping layer${bank.tracks.length === 1 ? "" : "s"}`;
         const article = document.createElement("article");
-        article.className = "sound-card";
+        article.className = "sound-card carousel-card";
         article.dataset.role = "bank-card";
         article.dataset.index = String(index);
 
@@ -857,28 +1093,28 @@ function renderBankCards() {
                 <span class="micro-copy" data-role="bank-layer-summary" data-index="${index}">${layerCountLabel}</span>
                 <div class="micro-actions">
                     <button class="status-chip reset-chip" type="button" data-role="bank-reset" data-index="${index}">Reset bed</button>
-                    <button class="status-chip blend-toggle" type="button" data-role="bank-blend-toggle" data-index="${index}" aria-expanded="false">Blend layers</button>
+                    <button class="status-chip blend-toggle" type="button" data-role="bank-blend-toggle" data-index="${index}" aria-controls="layer-panel">Blend layers</button>
                 </div>
-            </div>
-            <div class="layer-mixer" data-role="bank-layer-mixer" data-index="${index}" hidden>
-                ${bank.tracks.map((path, layerIndex) => `
-                    <label class="layer-row">
-                        <div class="layer-row-head">
-                            <span class="layer-name">${bank.trackLabels?.[layerIndex] || getTrackLabel(path)}</span>
-                            <strong class="layer-readout" data-role="bank-layer-readout" data-index="${index}" data-layer-index="${layerIndex}">100%</strong>
-                        </div>
-                        <input type="range" min="0" max="100" step="1" data-role="bank-layer-volume" data-index="${index}" data-layer-index="${layerIndex}">
-                    </label>
-                `).join("")}
             </div>
         `;
 
         dom.bankGrid.append(article);
     });
 
+    dom.bankGrid.querySelectorAll("[data-role='bank-card']").forEach((card) => {
+        card.addEventListener("click", (event) => {
+            if (event.target.closest("button, input, label")) {
+                return;
+            }
+
+            setSelectedBank(Number(card.dataset.index), { scrollCard: true });
+        });
+    });
+
     dom.bankGrid.querySelectorAll("[data-role='bank-toggle']").forEach((button) => {
         button.addEventListener("click", async () => {
             const index = Number(button.dataset.index);
+            setSelectedBank(index, { scrollCard: true });
             await ensureAudioReady();
             const nextBankState = {
                 ...state.banks[index],
@@ -901,6 +1137,7 @@ function renderBankCards() {
     dom.bankGrid.querySelectorAll("[data-role='bank-volume']").forEach((slider) => {
         slider.addEventListener("input", () => {
             const index = Number(slider.dataset.index);
+            setSelectedBank(index, { scrollCard: true });
             state.banks[index].volume = Number(slider.value);
             persistState();
             updateAllGains();
@@ -911,45 +1148,14 @@ function renderBankCards() {
     dom.bankGrid.querySelectorAll("[data-role='bank-reset']").forEach((button) => {
         button.addEventListener("click", () => {
             const index = Number(button.dataset.index);
+            setSelectedBank(index, { scrollCard: true });
             resetBankSliders(index);
         });
     });
 
     dom.bankGrid.querySelectorAll("[data-role='bank-blend-toggle']").forEach((button) => {
         button.addEventListener("click", () => {
-            const card = button.closest("[data-role='bank-card']");
-            if (!card) {
-                return;
-            }
-
-            const isExpanded = button.getAttribute("aria-expanded") === "true";
-            setBankMixerExpanded(card, !isExpanded);
-        });
-    });
-
-    dom.bankGrid.querySelectorAll("[data-role='bank-layer-volume']").forEach((slider) => {
-        slider.addEventListener("input", () => {
-            const bankIndex = Number(slider.dataset.index);
-            const layerIndex = Number(slider.dataset.layerIndex);
-            const nextLayerVolumes = [...state.banks[bankIndex].layerVolumes];
-            nextLayerVolumes[layerIndex] = Number(slider.value);
-
-            const nextMixMode = areLayerVolumesDefault(nextLayerVolumes) ? "stem" : "custom";
-            state.banks[bankIndex] = {
-                ...state.banks[bankIndex],
-                layerVolumes: nextLayerVolumes,
-                mixMode: nextMixMode,
-                mixPriority: nextMixMode === "custom" ? getNextMixPriority() : 0
-            };
-
-            persistState();
-            const playbackPlan = computePlaybackPlan();
-            if (state.banks[bankIndex].active && nextMixMode === "custom" && playbackPlan.bankModes[bankIndex] !== "custom") {
-                dom.statusText.textContent = "Custom blend saved, but stem mode is live until some streams are turned off.";
-            }
-
-            syncPlayback();
-            refreshCardStates();
+            setSelectedBank(Number(button.dataset.index), { scrollCard: true, scrollPanel: true });
         });
     });
 
@@ -958,10 +1164,11 @@ function renderBankCards() {
 
 function renderSoloCards() {
     dom.soloGrid.innerHTML = "";
+    ensureValidSelections();
 
     soloDefinitions.forEach((solo, index) => {
         const article = document.createElement("article");
-        article.className = "sound-card";
+        article.className = "sound-card carousel-card";
         article.dataset.role = "solo-card";
         article.dataset.index = String(index);
 
@@ -970,26 +1177,29 @@ function renderSoloCards() {
                 <button class="pill-button sound-toggle" type="button" data-role="solo-toggle" data-index="${index}" data-state-label="Standby">${solo.title}</button>
                 <p class="card-note">${solo.note}</p>
             </div>
-            <div class="control-grid">
-                <label class="control-label">
-                    <span>Level</span>
-                    <input type="range" min="0" max="100" step="1" data-role="solo-volume" data-index="${index}">
-                    <strong data-role="solo-volume-readout" data-index="${index}">62%</strong>
-                </label>
-                <label class="control-label">
-                    <span>Pan</span>
-                    <input type="range" min="-100" max="100" step="1" data-role="solo-pan" data-index="${index}">
-                    <strong data-role="solo-pan-readout" data-index="${index}">Center</strong>
-                </label>
+            <div class="micro-row">
+                <span class="micro-copy" data-role="solo-summary" data-index="${index}">Level 62% | Center</span>
+                <button class="status-chip select-chip" type="button" data-role="solo-focus" data-index="${index}">Shape loop</button>
             </div>
         `;
 
         dom.soloGrid.append(article);
     });
 
+    dom.soloGrid.querySelectorAll("[data-role='solo-card']").forEach((card) => {
+        card.addEventListener("click", (event) => {
+            if (event.target.closest("button, input, label")) {
+                return;
+            }
+
+            setSelectedSolo(Number(card.dataset.index), { scrollCard: true });
+        });
+    });
+
     dom.soloGrid.querySelectorAll("[data-role='solo-toggle']").forEach((button) => {
         button.addEventListener("click", async () => {
             const index = Number(button.dataset.index);
+            setSelectedSolo(index, { scrollCard: true });
             await ensureAudioReady();
             const nextSoloState = {
                 ...state.solos[index],
@@ -1009,23 +1219,9 @@ function renderSoloCards() {
         });
     });
 
-    dom.soloGrid.querySelectorAll("[data-role='solo-volume']").forEach((slider) => {
-        slider.addEventListener("input", () => {
-            const index = Number(slider.dataset.index);
-            state.solos[index].volume = Number(slider.value);
-            persistState();
-            updateAllGains();
-            refreshCardStates();
-        });
-    });
-
-    dom.soloGrid.querySelectorAll("[data-role='solo-pan']").forEach((slider) => {
-        slider.addEventListener("input", () => {
-            const index = Number(slider.dataset.index);
-            state.solos[index].pan = Number(slider.value);
-            persistState();
-            updateAllGains();
-            refreshCardStates();
+    dom.soloGrid.querySelectorAll("[data-role='solo-focus']").forEach((button) => {
+        button.addEventListener("click", () => {
+            setSelectedSolo(Number(button.dataset.index), { scrollCard: true, scrollPanel: true });
         });
     });
 
@@ -1034,6 +1230,11 @@ function renderSoloCards() {
 
 function refreshCardStates() {
     const playbackPlan = computePlaybackPlan();
+    ensureValidSelections();
+    const previousBankIndex = wrapIndex(selectedBankIndex - 1, bankDefinitions.length);
+    const nextBankIndex = wrapIndex(selectedBankIndex + 1, bankDefinitions.length);
+    const previousSoloIndex = wrapIndex(selectedSoloIndex - 1, soloDefinitions.length);
+    const nextSoloIndex = wrapIndex(selectedSoloIndex + 1, soloDefinitions.length);
 
     document.querySelectorAll("[data-role='bank-card']").forEach((card) => {
         const index = Number(card.dataset.index);
@@ -1042,41 +1243,51 @@ function refreshCardStates() {
         const slider = card.querySelector("[data-role='bank-volume']");
         const readout = card.querySelector("[data-role='bank-volume-readout']");
         const summary = card.querySelector("[data-role='bank-layer-summary']");
+        const blendButton = card.querySelector("[data-role='bank-blend-toggle']");
         const resolvedMode = playbackPlan.bankModes[index];
+        const selected = index === selectedBankIndex;
+        const previous = !selected && index === previousBankIndex;
+        const next = !selected && index === nextBankIndex;
 
         card.classList.toggle("is-active", config.active);
+        card.classList.toggle("is-selected", selected);
+        card.classList.toggle("is-prev", previous);
+        card.classList.toggle("is-next", next);
         toggle.classList.toggle("is-active", config.active);
         toggle.dataset.stateLabel = config.active ? "Live" : "Standby";
         slider.value = String(config.volume);
         readout.textContent = `${config.volume}%`;
         summary.textContent = getBankSummaryLabel(config, resolvedMode);
-
-        card.querySelectorAll("[data-role='bank-layer-volume']").forEach((layerSlider) => {
-            const layerIndex = Number(layerSlider.dataset.layerIndex);
-            const layerVolume = config.layerVolumes[layerIndex];
-            const layerReadout = card.querySelector(`[data-role='bank-layer-readout'][data-layer-index='${layerIndex}']`);
-            layerSlider.value = String(layerVolume);
-            layerReadout.textContent = `${layerVolume}%`;
-        });
+        blendButton.textContent = selected ? "Blend open" : "Blend layers";
+        blendButton.classList.toggle("is-selected", selected);
+        blendButton.setAttribute("aria-pressed", String(selected));
     });
+
+    renderSelectedBankPanel(playbackPlan);
 
     document.querySelectorAll("[data-role='solo-card']").forEach((card) => {
         const index = Number(card.dataset.index);
         const config = state.solos[index];
         const toggle = card.querySelector("[data-role='solo-toggle']");
-        const volumeSlider = card.querySelector("[data-role='solo-volume']");
-        const volumeReadout = card.querySelector("[data-role='solo-volume-readout']");
-        const panSlider = card.querySelector("[data-role='solo-pan']");
-        const panReadout = card.querySelector("[data-role='solo-pan-readout']");
+        const summary = card.querySelector("[data-role='solo-summary']");
+        const focusButton = card.querySelector("[data-role='solo-focus']");
+        const selected = index === selectedSoloIndex;
+        const previous = !selected && index === previousSoloIndex;
+        const next = !selected && index === nextSoloIndex;
 
         card.classList.toggle("is-active", config.active);
+        card.classList.toggle("is-selected", selected);
+        card.classList.toggle("is-prev", previous);
+        card.classList.toggle("is-next", next);
         toggle.classList.toggle("is-active", config.active);
         toggle.dataset.stateLabel = config.active ? "Live" : "Standby";
-        volumeSlider.value = String(config.volume);
-        volumeReadout.textContent = `${config.volume}%`;
-        panSlider.value = String(config.pan);
-        panReadout.textContent = formatPan(config.pan);
+        summary.textContent = `Level ${config.volume}% | ${formatPan(config.pan)}`;
+        focusButton.textContent = selected ? "Focus open" : "Shape loop";
+        focusButton.classList.toggle("is-selected", selected);
+        focusButton.setAttribute("aria-pressed", String(selected));
     });
+
+    renderSelectedSoloPanel();
 
     updateCounts();
 }
