@@ -51,3 +51,9 @@ Install to a connected Android device with USB debugging enabled:
 cd android-wrapper
 .\install-debug.cmd
 ```
+
+Screenshots:
+
+<img width="1080" height="2460" alt="Audio_Live" src="https://github.com/user-attachments/assets/e9b0785c-f2d1-46b5-81ee-ea8fb2c27b11" />
+<img width="1080" height="2460" alt="Ambient_Beds" src="https://github.com/user-attachments/assets/724f6b4b-ee7a-4576-9662-bdff412f67e4" />
+<img width="1080" height="2460" alt="Foreground_Loops" src="https://github.com/user-attachments/assets/2a7e63d3-2096-4f07-bca4-1eaad67e2593" />
